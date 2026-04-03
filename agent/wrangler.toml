@@ -1,0 +1,29 @@
+name = "prova-agent"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "JOB_AGENT"
+class_name = "JobAgent"
+
+[[durable_objects.bindings]]
+name = "DISPUTE_AGENT"
+class_name = "DisputeAgent"
+
+[[durable_objects.bindings]]
+name = "REPUTATION_AGENT"
+class_name = "ReputationAgent"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["JobAgent", "DisputeAgent", "ReputationAgent"]
+
+# Secrets (set via wrangler secret put):
+# CELO_PRIVATE_KEY
+# CLOUDFLARE_AI_GATEWAY_URL
+# CLAUDE_API_KEY
+# JOB_REGISTRY_ADDRESS
+# ESCROW_VAULT_ADDRESS
+# REPUTATION_LEDGER_ADDRESS
+# CELO_RPC_URL
