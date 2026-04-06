@@ -11,8 +11,8 @@ contract ArbiterPool {
     address public immutable owner;
     address public escrowVault; // set after deploy
 
-    uint256 public constant STAKE_AMOUNT = 10e18;  // 10 cUSD to become arbiter
-    uint256 public constant ARBITER_FEE  = 2e18;   // 2 cUSD fee per resolved dispute
+    uint256 public constant STAKE_AMOUNT = 1e14;   // 0.0001 cUSD to become arbiter
+    uint256 public constant ARBITER_FEE  = 2e13;   // 0.00002 cUSD fee per resolved dispute
     uint256 public constant UNSTAKE_COOLDOWN = 7 days;
 
     enum Vote { NONE, RELEASE, REFUND }
