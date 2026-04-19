@@ -27,3 +27,15 @@ export function ipfsToHttp(hash: string): string {
   const cid = hash.startsWith("ipfs://") ? hash.slice(7) : hash;
   return `https://w3s.link/ipfs/${cid}`;
 }
+
+export function celoscanTx(hash: string): string {
+  return `https://celoscan.io/tx/${hash}`;
+}
+
+export function celoscanAddress(addr: string): string {
+  return `https://celoscan.io/address/${addr}`;
+}
+
+export function daysUntil(ts: number): number {
+  return Math.ceil((ts * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
+}
