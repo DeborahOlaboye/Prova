@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { shortAddress } from "@/lib/utils";
+import { useMiniPay } from "@/hooks/useMiniPay";
+import { useEffect } from "react";
 import clsx from "clsx";
 
 const NAV_LINKS = [
@@ -19,6 +21,14 @@ export function Navbar() {
   const { address, isConnected } = useAccount();
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
+  const { isMiniPay, address: miniPayAddress } = useMiniPay();
+
+  // Auto-connect in MiniPay — no wallet modal needed
+  useEffect(() => {
+    if (isMiniPay && !isConnected) {
+      connect({ connector: injected() });
+    }
+  }, [isMiniPay, isConnected, connect]);
 
   return (
     <nav className="border-b border-[var(--border)] bg-[var(--surface)]/80 backdrop-blur-sm sticky top-0 z-50">
@@ -52,23 +62,29 @@ export function Navbar() {
         </div>
 
         {/* Wallet */}
-        <div className="shrink-0">
-          {isConnected && address ? (
+        <div className="shrink-0 flex items-center gap-2">
+          {isMiniPay && (
+            <span className="hidden sm:flex items-center gap-1 text-xs font-medium text-celo-green border border-celo-green/30 bg-celo-green/10 rounded-full px-2 py-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-celo-green" />
+              MiniPay
+            </span>
+          )}
+          {isConnected && (address || miniPayAddress) ? (
             <button
-              onClick={() => disconnect()}
+              onClick={() => !isMiniPay && disconnect()}
               className="flex items-center gap-2 border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm font-mono hover:bg-white/5 transition-colors"
             >
               <span className="w-2 h-2 rounded-full bg-celo-green" />
-              {shortAddress(address)}
+              {shortAddress((address || miniPayAddress)!)}
             </button>
-          ) : (
+          ) : !isMiniPay ? (
             <button
               onClick={() => connect({ connector: injected() })}
               className="btn-primary text-sm py-2 px-4"
             >
               Connect Wallet
             </button>
-          )}
+          ) : null}
         </div>
       </div>
     </nav>
