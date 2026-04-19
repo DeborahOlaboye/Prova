@@ -12,7 +12,7 @@ import {
   MINIPAY_FEE_CURRENCY,
 } from "@/lib/contracts";
 import { useMiniPay } from "@/hooks/useMiniPay";
-import { formatCUSD, formatDeadline, shortAddress, isExpired, ipfsToHttp } from "@/lib/utils";
+import { formatCUSD, formatDeadline, shortAddress, isExpired, ipfsToHttp, celoscanAddress } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ConnectPrompt } from "@/components/ConnectPrompt";
 
@@ -183,7 +183,14 @@ export default function JobDetailPage() {
       {job.freelancer !== "0x0000000000000000000000000000000000000000" && (
         <div className="card">
           <h2 className="font-semibold mb-2 text-sm text-white/50">Freelancer</h2>
-          <p className="font-mono text-sm">{job.freelancer}</p>
+          <a
+            href={celoscanAddress(job.freelancer)}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-sm hover:text-celo-green transition-colors"
+          >
+            {job.freelancer} ↗
+          </a>
         </div>
       )}
 
