@@ -9,7 +9,9 @@ import {
   ESCROW_VAULT_ABI,
   JobStatus,
   JobStruct,
+  MINIPAY_FEE_CURRENCY,
 } from "@/lib/contracts";
+import { useMiniPay } from "@/hooks/useMiniPay";
 import { formatCUSD, formatDeadline, shortAddress, isExpired, ipfsToHttp } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ConnectPrompt } from "@/components/ConnectPrompt";
@@ -17,6 +19,8 @@ import { ConnectPrompt } from "@/components/ConnectPrompt";
 export default function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const { address, isConnected } = useAccount();
+  const { isMiniPay } = useMiniPay();
+  const feeCurrency = isMiniPay ? { feeCurrency: MINIPAY_FEE_CURRENCY } : {};
 
   const [deliverable, setDeliverable] = useState("");
   const [txError, setTxError] = useState("");
@@ -81,12 +85,7 @@ export default function JobDetailPage() {
   const handleAccept = () => {
     setTxError("");
     acceptWrite(
-      {
-        address: CONTRACT_ADDRESSES.jobRegistry,
-        abi: JOB_REGISTRY_ABI,
-        functionName: "acceptJob",
-        args: [job.jobId],
-      },
+      { address: CONTRACT_ADDRESSES.jobRegistry, abi: JOB_REGISTRY_ABI, functionName: "acceptJob", args: [job.jobId], ...feeCurrency } as Parameters<typeof acceptWrite>[0],
       { onSuccess: () => refetch() }
     );
   };
@@ -95,12 +94,7 @@ export default function JobDetailPage() {
     setTxError("");
     if (!deliverable.trim()) return setTxError("Deliverable link/hash is required");
     submitWrite(
-      {
-        address: CONTRACT_ADDRESSES.jobRegistry,
-        abi: JOB_REGISTRY_ABI,
-        functionName: "submitWork",
-        args: [job.jobId, deliverable.trim()],
-      },
+      { address: CONTRACT_ADDRESSES.jobRegistry, abi: JOB_REGISTRY_ABI, functionName: "submitWork", args: [job.jobId, deliverable.trim()], ...feeCurrency } as Parameters<typeof submitWrite>[0],
       { onSuccess: () => refetch() }
     );
   };
@@ -108,12 +102,7 @@ export default function JobDetailPage() {
   const handleCancel = () => {
     setTxError("");
     cancelWrite(
-      {
-        address: CONTRACT_ADDRESSES.jobRegistry,
-        abi: JOB_REGISTRY_ABI,
-        functionName: "cancelJob",
-        args: [job.jobId],
-      },
+      { address: CONTRACT_ADDRESSES.jobRegistry, abi: JOB_REGISTRY_ABI, functionName: "cancelJob", args: [job.jobId], ...feeCurrency } as Parameters<typeof cancelWrite>[0],
       { onSuccess: () => refetch() }
     );
   };
