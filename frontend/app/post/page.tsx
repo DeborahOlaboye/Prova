@@ -7,12 +7,15 @@ import {
   CONTRACT_ADDRESSES,
   JOB_REGISTRY_ABI,
   ERC20_ABI,
+  MINIPAY_FEE_CURRENCY,
 } from "@/lib/contracts";
+import { useMiniPay } from "@/hooks/useMiniPay";
 import { ConnectPrompt } from "@/components/ConnectPrompt";
 import { useRouter } from "next/navigation";
 
 export default function PostJobPage() {
   const { address, isConnected } = useAccount();
+  const { isMiniPay } = useMiniPay();
   const router = useRouter();
 
   const [title, setTitle] = useState("");
@@ -58,6 +61,8 @@ export default function PostJobPage() {
   const { isLoading: postConfirming, isSuccess: postSuccess } =
     useWaitForTransactionReceipt({ hash: postTxHash });
 
+  const feeCurrency = isMiniPay ? { feeCurrency: MINIPAY_FEE_CURRENCY } : {};
+
   const handleApprove = () => {
     setError("");
     approveWrite({
@@ -65,7 +70,8 @@ export default function PostJobPage() {
       abi: ERC20_ABI,
       functionName: "approve",
       args: [CONTRACT_ADDRESSES.jobRegistry, bounty],
-    });
+      ...feeCurrency,
+    } as Parameters<typeof approveWrite>[0]);
   };
 
   const handlePost = () => {
@@ -82,7 +88,8 @@ export default function PostJobPage() {
         abi: JOB_REGISTRY_ABI,
         functionName: "postJob",
         args: [title.trim(), criteria.trim(), bounty, Number(deadlineTs)],
-      },
+        ...feeCurrency,
+      } as Parameters<typeof postWrite>[0],
       {
         onSuccess: () => {
           setTimeout(() => router.push("/"), 2000);
