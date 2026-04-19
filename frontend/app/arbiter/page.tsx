@@ -5,13 +5,17 @@ import {
   CONTRACT_ADDRESSES,
   ARBITER_POOL_ABI,
   ERC20_ABI,
+  MINIPAY_FEE_CURRENCY,
 } from "@/lib/contracts";
+import { useMiniPay } from "@/hooks/useMiniPay";
 import { formatCUSD } from "@/lib/utils";
 import { ConnectPrompt } from "@/components/ConnectPrompt";
 import { useState } from "react";
 
 export default function ArbiterPage() {
   const { address, isConnected } = useAccount();
+  const { isMiniPay } = useMiniPay();
+  const feeCurrency = isMiniPay ? { feeCurrency: MINIPAY_FEE_CURRENCY } : {};
   const [voteDisputeId, setVoteDisputeId] = useState("");
   const [txError, setTxError] = useState("");
 
@@ -102,17 +106,14 @@ export default function ArbiterPage() {
       abi: ERC20_ABI,
       functionName: "approve",
       args: [CONTRACT_ADDRESSES.arbiterPool, stake],
-    });
+      ...feeCurrency,
+    } as Parameters<typeof approveWrite>[0]);
   };
 
   const handleStake = () => {
     setTxError("");
     stakeWrite(
-      {
-        address: CONTRACT_ADDRESSES.arbiterPool,
-        abi: ARBITER_POOL_ABI,
-        functionName: "stake",
-      },
+      { address: CONTRACT_ADDRESSES.arbiterPool, abi: ARBITER_POOL_ABI, functionName: "stake", ...feeCurrency } as Parameters<typeof stakeWrite>[0],
       { onSuccess: () => refetchArbiter() }
     );
   };
@@ -120,11 +121,7 @@ export default function ArbiterPage() {
   const handleRequestUnstake = () => {
     setTxError("");
     requestUnstakeWrite(
-      {
-        address: CONTRACT_ADDRESSES.arbiterPool,
-        abi: ARBITER_POOL_ABI,
-        functionName: "requestUnstake",
-      },
+      { address: CONTRACT_ADDRESSES.arbiterPool, abi: ARBITER_POOL_ABI, functionName: "requestUnstake", ...feeCurrency } as Parameters<typeof requestUnstakeWrite>[0],
       { onSuccess: () => refetchArbiter() }
     );
   };
@@ -132,11 +129,7 @@ export default function ArbiterPage() {
   const handleUnstake = () => {
     setTxError("");
     unstakeWrite(
-      {
-        address: CONTRACT_ADDRESSES.arbiterPool,
-        abi: ARBITER_POOL_ABI,
-        functionName: "unstake",
-      },
+      { address: CONTRACT_ADDRESSES.arbiterPool, abi: ARBITER_POOL_ABI, functionName: "unstake", ...feeCurrency } as Parameters<typeof unstakeWrite>[0],
       { onSuccess: () => { refetchArbiter(); refetchFees(); } }
     );
   };
@@ -144,11 +137,7 @@ export default function ArbiterPage() {
   const handleClaimFee = () => {
     setTxError("");
     claimWrite(
-      {
-        address: CONTRACT_ADDRESSES.arbiterPool,
-        abi: ARBITER_POOL_ABI,
-        functionName: "claimFee",
-      },
+      { address: CONTRACT_ADDRESSES.arbiterPool, abi: ARBITER_POOL_ABI, functionName: "claimFee", ...feeCurrency } as Parameters<typeof claimWrite>[0],
       { onSuccess: () => refetchFees() }
     );
   };
@@ -161,7 +150,8 @@ export default function ArbiterPage() {
       abi: ARBITER_POOL_ABI,
       functionName: "submitVote",
       args: [voteDisputeId.trim() as `0x${string}`, vote],
-    });
+      ...feeCurrency,
+    } as Parameters<typeof voteWrite>[0]);
   };
 
   const cooldownEnd = unstakeRequestedAt > 0n
