@@ -1,3 +1,6 @@
+// cUSD is used as feeCurrency for MiniPay transactions (legacy tx type required)
+export const MINIPAY_FEE_CURRENCY = "0x765DE816845861e75A25fCA122bb6898B8B1282a" as `0x${string}`;
+
 // Contract addresses — set via environment variables
 export const CONTRACT_ADDRESSES = {
   jobRegistry: (process.env.NEXT_PUBLIC_JOB_REGISTRY_ADDRESS ?? "") as `0x${string}`,
