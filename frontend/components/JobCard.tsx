@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { JobStruct, JobStatus } from "@/lib/contracts";
-import { formatCUSD, formatDeadline, isExpired, shortAddress } from "@/lib/utils";
+import { formatCUSD, formatDeadline, isExpired, shortAddress, daysUntil } from "@/lib/utils";
 import { StatusBadge } from "./StatusBadge";
 
 interface JobCardProps {
@@ -40,7 +40,9 @@ export function JobCard({ job }: JobCardProps) {
           </span>
           {job.status === JobStatus.OPEN && !expired && (
             <span className="ml-auto text-celo-green font-medium">
-              Available →
+              {daysUntil(job.deadline) <= 3
+                ? `${daysUntil(job.deadline)}d left`
+                : "Available →"}
             </span>
           )}
         </div>

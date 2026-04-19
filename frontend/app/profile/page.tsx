@@ -7,7 +7,7 @@ import {
   REPUTATION_LEDGER_ABI,
   JobStruct,
 } from "@/lib/contracts";
-import { formatCUSD, shortAddress } from "@/lib/utils";
+import { formatCUSD, shortAddress, celoscanAddress } from "@/lib/utils";
 import { ConnectPrompt } from "@/components/ConnectPrompt";
 import { JobCard } from "@/components/JobCard";
 
@@ -129,7 +129,14 @@ export default function ProfilePage() {
         <ScoreRing score={score} />
         <div>
           <h1 className="text-2xl font-bold">{shortAddress(address!)}</h1>
-          <p className="text-white/40 text-sm mt-1 font-mono">{address}</p>
+          <a
+            href={celoscanAddress(address!)}
+            target="_blank"
+            rel="noreferrer"
+            className="text-white/40 text-sm mt-1 font-mono hover:text-celo-green transition-colors"
+          >
+            {address} ↗
+          </a>
           {s && s.memberSince > 0 && (
             <p className="text-white/30 text-xs mt-2">
               Member since{" "}

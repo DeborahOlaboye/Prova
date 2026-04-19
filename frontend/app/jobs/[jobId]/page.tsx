@@ -9,14 +9,18 @@ import {
   ESCROW_VAULT_ABI,
   JobStatus,
   JobStruct,
+  MINIPAY_FEE_CURRENCY,
 } from "@/lib/contracts";
-import { formatCUSD, formatDeadline, shortAddress, isExpired, ipfsToHttp } from "@/lib/utils";
+import { useMiniPay } from "@/hooks/useMiniPay";
+import { formatCUSD, formatDeadline, shortAddress, isExpired, ipfsToHttp, celoscanAddress } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ConnectPrompt } from "@/components/ConnectPrompt";
 
 export default function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const { address, isConnected } = useAccount();
+  const { isMiniPay } = useMiniPay();
+  const feeCurrency = isMiniPay ? { feeCurrency: MINIPAY_FEE_CURRENCY } : {};
 
   const [deliverable, setDeliverable] = useState("");
   const [txError, setTxError] = useState("");
@@ -81,12 +85,7 @@ export default function JobDetailPage() {
   const handleAccept = () => {
     setTxError("");
     acceptWrite(
-      {
-        address: CONTRACT_ADDRESSES.jobRegistry,
-        abi: JOB_REGISTRY_ABI,
-        functionName: "acceptJob",
-        args: [job.jobId],
-      },
+      { address: CONTRACT_ADDRESSES.jobRegistry, abi: JOB_REGISTRY_ABI, functionName: "acceptJob", args: [job.jobId], ...feeCurrency } as Parameters<typeof acceptWrite>[0],
       { onSuccess: () => refetch() }
     );
   };
@@ -95,12 +94,7 @@ export default function JobDetailPage() {
     setTxError("");
     if (!deliverable.trim()) return setTxError("Deliverable link/hash is required");
     submitWrite(
-      {
-        address: CONTRACT_ADDRESSES.jobRegistry,
-        abi: JOB_REGISTRY_ABI,
-        functionName: "submitWork",
-        args: [job.jobId, deliverable.trim()],
-      },
+      { address: CONTRACT_ADDRESSES.jobRegistry, abi: JOB_REGISTRY_ABI, functionName: "submitWork", args: [job.jobId, deliverable.trim()], ...feeCurrency } as Parameters<typeof submitWrite>[0],
       { onSuccess: () => refetch() }
     );
   };
@@ -108,12 +102,7 @@ export default function JobDetailPage() {
   const handleCancel = () => {
     setTxError("");
     cancelWrite(
-      {
-        address: CONTRACT_ADDRESSES.jobRegistry,
-        abi: JOB_REGISTRY_ABI,
-        functionName: "cancelJob",
-        args: [job.jobId],
-      },
+      { address: CONTRACT_ADDRESSES.jobRegistry, abi: JOB_REGISTRY_ABI, functionName: "cancelJob", args: [job.jobId], ...feeCurrency } as Parameters<typeof cancelWrite>[0],
       { onSuccess: () => refetch() }
     );
   };
@@ -194,7 +183,14 @@ export default function JobDetailPage() {
       {job.freelancer !== "0x0000000000000000000000000000000000000000" && (
         <div className="card">
           <h2 className="font-semibold mb-2 text-sm text-white/50">Freelancer</h2>
-          <p className="font-mono text-sm">{job.freelancer}</p>
+          <a
+            href={celoscanAddress(job.freelancer)}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-sm hover:text-celo-green transition-colors"
+          >
+            {job.freelancer} ↗
+          </a>
         </div>
       )}
 
