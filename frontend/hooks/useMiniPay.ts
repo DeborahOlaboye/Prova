@@ -15,9 +15,13 @@ export function useMiniPay() {
   const [isMiniPay, setIsMiniPay] = useState(false);
   const [address, setAddress] = useState<`0x${string}` | null>(null);
   const [client, setClient] = useState<ReturnType<typeof createWalletClient> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      setIsLoading(false);
+      return;
+    }
 
     if (window.ethereum && window.ethereum.isMiniPay) {
       setIsMiniPay(true);
@@ -31,9 +35,12 @@ export function useMiniPay() {
 
       walletClient.getAddresses().then(([addr]) => {
         setAddress(addr);
+        setIsLoading(false);
       });
+    } else {
+      setIsLoading(false);
     }
   }, []);
 
-  return { isMiniPay, address, client };
+  return { isMiniPay, address, client, isLoading };
 }
