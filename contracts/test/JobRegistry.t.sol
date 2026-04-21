@@ -274,6 +274,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_DeadlineTooSoonRevertsEarly() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        uint256 gasBefore = gasleft();
+        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
+        registry.postJob("Rush job", "ipfs://QmCriteriaHash", BOUNTY, uint40(block.timestamp + 30 minutes));
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Deadline validation should revert early with minimal gas (before external calls)
+        assertLt(gasUsed, 50000, "DeadlineTooSoon should revert with minimal gas");
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
