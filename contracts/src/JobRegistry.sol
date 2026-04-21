@@ -104,6 +104,7 @@ contract JobRegistry {
     ) external returns (bytes32 jobId) {
         if (bounty < MIN_BOUNTY) revert BountyTooLow();
         if (deadline <= block.timestamp) revert InvalidDeadline();
+        if (deadline < block.timestamp + MIN_DEADLINE_BUFFER) revert DeadlineTooSoon();
 
         jobId = keccak256(
             abi.encodePacked(msg.sender, title, block.timestamp, bounty)
