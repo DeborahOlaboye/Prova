@@ -240,6 +240,18 @@ contract JobRegistryTest is Test {
         assertEq(registry.getOpenJobCount(), 0);
     }
 
+    function test_CancelJobRefundGasEfficiency() public {
+        bytes32 jobId = _postJob();
+
+        uint256 gasBefore = gasleft();
+        vm.prank(client);
+        registry.cancelJob(jobId);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Cancel with refund should use reasonable gas
+        assertLt(gasUsed, 200000, "Cancel job with refund should be gas efficient");
+    }
+
     function test_CannotCancelInProgressJob() public {
         bytes32 jobId = _postAndAcceptJob();
 
