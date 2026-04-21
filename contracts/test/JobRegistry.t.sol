@@ -248,6 +248,18 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CannotPostJobWithOneSecondUnderBuffer() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline 1 second less than 1 hour should revert
+        uint40 oneSecondUnder = uint40(block.timestamp + 1 hours - 1 seconds);
+
+        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
+        registry.postJob("Almost enough time", "ipfs://QmCriteriaHash", BOUNTY, oneSecondUnder);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
