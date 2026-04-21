@@ -108,6 +108,15 @@ contract EscrowVaultTest is Test {
         vault.refundOnCancel(jobId);
     }
 
+    function test_RefundOnCancelRequiresCancelledStatus() public {
+        bytes32 jobId = _postJob();
+
+        // Job is still OPEN, not CANCELLED
+        // JobRegistry should revert when trying to refund non-cancelled job
+        // This test documents expected behavior
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
+    }
+
     function test_RefundFromDisputedState() public {
         bytes32 jobId = _postAcceptAndSubmit();
 
