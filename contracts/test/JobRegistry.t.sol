@@ -196,6 +196,18 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CannotPostJobWithDeadlineJustBelowMinimum() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline 59 minutes from now should revert (just under 1 hour)
+        uint40 justUnderMin = uint40(block.timestamp + 59 minutes);
+
+        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
+        registry.postJob("Rush job", "ipfs://QmCriteriaHash", BOUNTY, justUnderMin);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
