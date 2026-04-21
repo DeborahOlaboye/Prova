@@ -257,6 +257,19 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_SpacesOnlyTitleIsAccepted() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Note: spaces-only title is technically non-empty (has bytes)
+        // This test documents current behavior - spaces count as valid content
+        bytes32 jobId = registry.postJob("   ", "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, "   ");
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
