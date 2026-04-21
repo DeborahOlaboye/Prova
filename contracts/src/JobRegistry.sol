@@ -201,7 +201,9 @@ contract JobRegistry {
         emit JobRefunded(jobId);
     }
 
-    /// @notice Client cancels an open job and gets refund.
+    /// @notice Client cancels an open job and receives a full refund of the bounty.
+    /// @dev Only the client who posted the job can cancel it. Refunds are processed through EscrowVault.
+    /// @param jobId The ID of the job to cancel.
     function cancelJob(bytes32 jobId) external {
         Job storage j = _jobs[jobId];
         if (j.client != msg.sender) revert Unauthorized();
@@ -209,6 +211,13 @@ contract JobRegistry {
 
         j.status = JobStatus.CANCELLED;
         _removeFromOpenJobs(jobId);
+
+        // Refund the bounty to the client via EscrowVault
+        // This ensures locked funds are returned when client cancels
+        (bool ok,) = escrowVault.call(
+            abi.encodeWithSignature("refundOnCancel(bytes32)", jobId)
+        );
+        require(ok, "refundOnCancel failed");
 
         emit JobCancelled(jobId);
     }

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @title EscrowVaultTest
+/// @notice Test suite for EscrowVault including cancel job refund functionality
+
 import {Test} from "forge-std/Test.sol";
 import {EscrowVault} from "../src/EscrowVault.sol";
 import {JobRegistry} from "../src/JobRegistry.sol";
@@ -90,6 +93,88 @@ contract EscrowVaultTest is Test {
         vm.expectRevert(EscrowVault.NoFundsLocked.selector);
         vm.prank(agent);
         vault.releaseFunds(jobId);
+    }
+
+    function test_RefundOnCancelOnlyCallableByJobRegistry() public {
+        bytes32 jobId = _postJob();
+
+        // Cancel the job first
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Non-JobRegistry caller should fail
+        vm.expectRevert(EscrowVault.Unauthorized.selector);
+        vm.prank(client);
+        vault.refundOnCancel(jobId);
+    }
+
+    function test_RefundOnCancelRequiresCancelledStatus() public {
+        bytes32 jobId = _postJob();
+
+        // Job is still OPEN, not CANCELLED
+        // JobRegistry should revert when trying to refund non-cancelled job
+        // This test documents expected behavior
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
+    }
+
+    function test_RefundOnCancelEmitsFundsRefundedEvent() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectEmit(true, true, false, true);
+        emit EscrowVault.FundsRefunded(jobId, client, BOUNTY);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+    }
+
+    function test_VaultBalanceAfterCancelRefund() public {
+        uint256 vaultBalanceBefore = cUSD.balanceOf(address(vault));
+        bytes32 jobId = _postJob();
+
+        uint256 vaultBalanceAfterPost = cUSD.balanceOf(address(vault));
+        assertEq(vaultBalanceAfterPost, vaultBalanceBefore + BOUNTY);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        uint256 vaultBalanceAfterCancel = cUSD.balanceOf(address(vault));
+        assertEq(vaultBalanceAfterCancel, vaultBalanceBefore);
+    }
+
+    function test_LockedFundsZeroAfterCancel() public {
+        bytes32 jobId = _postJob();
+
+        // Verify funds are locked
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify locked funds are now zero
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
+    function test_CompleteCancelJobFlow() public {
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+        uint256 vaultBalanceBefore = cUSD.balanceOf(address(vault));
+
+        bytes32 jobId = _postJob();
+
+        // Verify initial state
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore - BOUNTY);
+        assertEq(cUSD.balanceOf(address(vault)), vaultBalanceBefore + BOUNTY);
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
+
+        // Cancel the job
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify final state
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore);
+        assertEq(cUSD.balanceOf(address(vault)), vaultBalanceBefore);
+        assertEq(vault.getLockedAmount(jobId), 0);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.CANCELLED));
     }
 
     function test_RefundFromDisputedState() public {

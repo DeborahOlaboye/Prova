@@ -131,6 +131,185 @@ contract JobRegistryTest is Test {
         registry.cancelJob(jobId);
 
         assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.CANCELLED));
+        // Verify client got their bounty back
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore + BOUNTY);
+    }
+
+    function test_CancelJobReleasesVaultFunds() public {
+        bytes32 jobId = _postJob();
+
+        // Verify funds are locked before cancel
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify funds are released from vault after cancel
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
+    function test_CancelJobEmitsFundsRefundedEvent() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectEmit(true, true, false, true);
+        emit EscrowVault.FundsRefunded(jobId, client, BOUNTY);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+    }
+
+    function test_CancelJobRefundsDifferentBountyAmounts() public {
+        // Test with 5 cUSD bounty
+        uint256 customBounty = 5e18;
+        vm.startPrank(client);
+        cUSD.approve(address(registry), customBounty);
+
+        uint40 deadline = uint40(block.timestamp + 7 days);
+        bytes32 jobId = registry.postJob("Custom bounty job", "ipfs://QmCriteria", customBounty, deadline);
+
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+
+        registry.cancelJob(jobId);
+
+        // Verify full custom bounty is refunded
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore + customBounty);
+        vm.stopPrank();
+    }
+
+    function test_OnlyClientCanCancelAndGetRefund() public {
+        bytes32 jobId = _postJob();
+
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+        uint256 freelancerBalanceBefore = cUSD.balanceOf(freelancer);
+
+        // Freelancer tries to cancel - should revert
+        vm.expectRevert(JobRegistry.Unauthorized.selector);
+        vm.prank(freelancer);
+        registry.cancelJob(jobId);
+
+        // Verify no funds moved
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore);
+        assertEq(cUSD.balanceOf(freelancer), freelancerBalanceBefore);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
+    }
+
+    function test_CancelJobEmitsJobCancelledEvent() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectEmit(true, false, false, false);
+        emit JobRegistry.JobCancelled(jobId);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+    }
+
+    function test_MultipleJobCancellationsWithRefunds() public {
+        // Post multiple jobs
+        bytes32 jobId1 = _postJob();
+        bytes32 jobId2 = _postJob();
+
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+        uint256 totalLocked = BOUNTY * 2;
+
+        // Cancel both jobs
+        vm.startPrank(client);
+        registry.cancelJob(jobId1);
+        registry.cancelJob(jobId2);
+        vm.stopPrank();
+
+        // Verify both jobs cancelled
+        assertEq(uint8(registry.getJob(jobId1).status), uint8(JobRegistry.JobStatus.CANCELLED));
+        assertEq(uint8(registry.getJob(jobId2).status), uint8(JobRegistry.JobStatus.CANCELLED));
+
+        // Verify both refunds received
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore + totalLocked);
+        assertEq(vault.getLockedAmount(jobId1), 0);
+        assertEq(vault.getLockedAmount(jobId2), 0);
+    }
+
+    function test_CancelJobRefundsMinimumBounty() public {
+        // Test with minimum bounty (0.00001 cUSD)
+        uint256 minBounty = 1e13;
+        vm.startPrank(client);
+        cUSD.approve(address(registry), minBounty);
+
+        uint40 deadline = uint40(block.timestamp + 7 days);
+        bytes32 jobId = registry.postJob("Minimum bounty job", "ipfs://QmCriteria", minBounty, deadline);
+
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+
+        registry.cancelJob(jobId);
+
+        // Verify minimum bounty is fully refunded
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore + minBounty);
+        assertEq(vault.getLockedAmount(jobId), 0);
+        vm.stopPrank();
+    }
+
+    function test_SecondCancelDoesNotAffectFirstRefund() public {
+        bytes32 jobId1 = _postJob();
+        bytes32 jobId2 = _postJob();
+
+        vm.startPrank(client);
+
+        // Cancel first job
+        registry.cancelJob(jobId1);
+        assertEq(vault.getLockedAmount(jobId1), 0);
+        assertEq(vault.getLockedAmount(jobId2), BOUNTY);
+
+        // Cancel second job
+        registry.cancelJob(jobId2);
+        assertEq(vault.getLockedAmount(jobId2), 0);
+
+        vm.stopPrank();
+    }
+
+    function test_CancelJobRefundIntegration() public {
+        // Complete integration test for cancel and refund
+        uint256 initialClientBalance = cUSD.balanceOf(client);
+        uint256 initialVaultBalance = cUSD.balanceOf(address(vault));
+
+        bytes32 jobId = _postJob();
+
+        // Verify funds moved from client to vault
+        assertEq(cUSD.balanceOf(client), initialClientBalance - BOUNTY);
+        assertEq(cUSD.balanceOf(address(vault)), initialVaultBalance + BOUNTY);
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+
+        // Cancel and verify refund
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify funds returned to client
+        assertEq(cUSD.balanceOf(client), initialClientBalance);
+        assertEq(cUSD.balanceOf(address(vault)), initialVaultBalance);
+        assertEq(vault.getLockedAmount(jobId), 0);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.CANCELLED));
+    }
+
+    function test_CancelledJobRemovedFromOpenJobIds() public {
+        bytes32 jobId = _postJob();
+
+        // Verify job is in openJobIds before cancel
+        assertEq(registry.getOpenJobCount(), 1);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify job is removed from openJobIds after cancel
+        assertEq(registry.getOpenJobCount(), 0);
+    }
+
+    function test_CancelJobRefundGasEfficiency() public {
+        bytes32 jobId = _postJob();
+
+        uint256 gasBefore = gasleft();
+        vm.prank(client);
+        registry.cancelJob(jobId);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Cancel with refund should use reasonable gas
+        assertLt(gasUsed, 200000, "Cancel job with refund should be gas efficient");
     }
 
     function test_CannotCancelInProgressJob() public {

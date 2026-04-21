@@ -97,6 +97,25 @@ contract EscrowVault {
         emit FundsRefunded(jobId, job.client, amount);
     }
 
+    /// @notice Refund bounty to client when job is cancelled by client.
+    /// @dev Only callable by JobRegistry during cancelJob operation.
+    /// @param jobId The ID of the job being cancelled.
+    /// @custom:access Only callable by JobRegistry contract.
+    function refundOnCancel(bytes32 jobId) external {
+        if (msg.sender != address(jobRegistry)) revert Unauthorized();
+
+        uint256 amount = lockedFunds[jobId];
+        if (amount == 0) revert NoFundsLocked();
+
+        JobRegistry.Job memory job = jobRegistry.getJob(jobId);
+        if (job.status != JobRegistry.JobStatus.CANCELLED) revert JobNotInExpectedState();
+
+        lockedFunds[jobId] = 0;
+        cUSD.transfer(job.client, amount);
+
+        emit FundsRefunded(jobId, job.client, amount);
+    }
+
     /// @notice Escalate to arbiter pool when AI cannot resolve dispute.
     function escalateToArbiters(bytes32 jobId) external onlyAgent returns (bytes32 disputeId) {
         uint256 amount = lockedFunds[jobId];
