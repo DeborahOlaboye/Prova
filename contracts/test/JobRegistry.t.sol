@@ -135,6 +135,19 @@ contract JobRegistryTest is Test {
         assertEq(cUSD.balanceOf(client), clientBalanceBefore + BOUNTY);
     }
 
+    function test_CancelJobReleasesVaultFunds() public {
+        bytes32 jobId = _postJob();
+
+        // Verify funds are locked before cancel
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify funds are released from vault after cancel
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
     function test_CannotCancelInProgressJob() public {
         bytes32 jobId = _postAndAcceptJob();
 
