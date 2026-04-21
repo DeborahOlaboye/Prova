@@ -284,6 +284,22 @@ contract JobRegistryTest is Test {
         assertEq(uint8(job.status), uint8(JobRegistry.JobStatus.SUBMITTED));
     }
 
+    function test_PostJobEmitsEventWithValidInput() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectEmit(true, true, false, true);
+        emit JobRegistry.JobPosted(
+            keccak256(abi.encodePacked(client, "Test Job Title", block.timestamp, BOUNTY)),
+            client,
+            BOUNTY,
+            uint40(block.timestamp + DEADLINE)
+        );
+
+        registry.postJob("Test Job Title", "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
