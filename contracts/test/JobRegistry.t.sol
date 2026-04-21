@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @title JobRegistryTest
+/// @notice Test suite for JobRegistry including minimum deadline buffer validation
+/// @dev Tests cover DeadlineTooSoon error and MIN_DEADLINE_BUFFER constant
+
 import {Test} from "forge-std/Test.sol";
 import {JobRegistry} from "../src/JobRegistry.sol";
 import {EscrowVault} from "../src/EscrowVault.sol";
