@@ -155,6 +155,15 @@ contract JobRegistryTest is Test {
         assertEq(jobs[1], id2);
     }
 
+    function test_CannotPostJobWithEmptyTitle() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectRevert(JobRegistry.EmptyTitle.selector);
+        registry.postJob("", "ipfs://QmCriteriaHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
