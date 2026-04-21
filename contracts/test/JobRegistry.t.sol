@@ -155,6 +155,18 @@ contract JobRegistryTest is Test {
         assertEq(jobs[1], id2);
     }
 
+    function test_CannotPostJobWithDeadlineTooSoon() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline less than 1 hour from now should revert
+        uint40 tooSoonDeadline = uint40(block.timestamp + 30 minutes);
+
+        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
+        registry.postJob("Write a landing page", "ipfs://QmCriteriaHash", BOUNTY, tooSoonDeadline);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
