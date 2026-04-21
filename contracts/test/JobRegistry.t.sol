@@ -182,6 +182,18 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithValidTitleAndCriteria() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        bytes32 jobId = registry.postJob("Valid Job Title", "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, "Valid Job Title");
+        assertEq(job.criteriaIPFSHash, "ipfs://QmValidHash");
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
