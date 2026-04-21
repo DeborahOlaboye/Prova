@@ -105,6 +105,7 @@ contract JobRegistry {
     ) external returns (bytes32 jobId) {
         if (bounty < MIN_BOUNTY) revert BountyTooLow();
         if (deadline <= block.timestamp) revert InvalidDeadline();
+        // Convert strings to bytes to check length - prevents empty string inputs
         if (bytes(title).length == 0) revert EmptyTitle();
         if (bytes(criteriaIPFSHash).length == 0) revert EmptyCriteria();
 
