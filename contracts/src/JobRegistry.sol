@@ -96,6 +96,7 @@ contract JobRegistry {
     }
 
     /// @notice Post a new job. Bounty is locked in EscrowVault immediately.
+    /// @dev Validates that title and criteriaIPFSHash are non-empty strings.
     function postJob(
         string calldata title,
         string calldata criteriaIPFSHash,
