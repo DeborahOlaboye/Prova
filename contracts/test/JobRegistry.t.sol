@@ -314,6 +314,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_EmptyCriteriaRevertsEarly() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        uint256 gasBefore = gasleft();
+        vm.expectRevert(JobRegistry.EmptyCriteria.selector);
+        registry.postJob("Valid Title", "", BOUNTY, uint40(block.timestamp + DEADLINE));
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Empty criteria validation should revert early with minimal gas
+        assertLt(gasUsed, 50000, "Empty criteria should revert with minimal gas");
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
