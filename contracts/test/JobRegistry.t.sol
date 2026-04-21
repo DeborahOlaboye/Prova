@@ -321,6 +321,24 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_JobPostedEventEmitsCorrectDeadline() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        uint40 testDeadline = uint40(block.timestamp + 2 hours);
+
+        vm.expectEmit(true, true, false, true);
+        emit JobRegistry.JobPosted(
+            keccak256(abi.encodePacked(client, "Event test job", block.timestamp, BOUNTY)),
+            client,
+            BOUNTY,
+            testDeadline
+        );
+
+        registry.postJob("Event test job", "ipfs://QmCriteriaHash", BOUNTY, testDeadline);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
