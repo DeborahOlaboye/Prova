@@ -343,6 +343,18 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CannotPostJobWithFiveMinuteDeadline() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline 5 minutes from now should revert
+        uint40 fiveMinDeadline = uint40(block.timestamp + 5 minutes);
+
+        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
+        registry.postJob("Quick task", "ipfs://QmCriteriaHash", BOUNTY, fiveMinDeadline);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
