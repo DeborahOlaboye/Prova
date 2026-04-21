@@ -293,6 +293,20 @@ contract JobRegistryTest is Test {
         assertEq(registry.MIN_DEADLINE_BUFFER(), 1 hours);
     }
 
+    function test_CanPostJobWithFarFutureDeadline() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline 30 days from now should succeed
+        uint40 farFuture = uint40(block.timestamp + 30 days);
+
+        bytes32 jobId = registry.postJob("Long term project", "ipfs://QmCriteriaHash", BOUNTY, farFuture);
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deadline, farFuture);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
