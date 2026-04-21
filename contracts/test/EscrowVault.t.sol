@@ -154,6 +154,29 @@ contract EscrowVaultTest is Test {
         assertEq(vault.getLockedAmount(jobId), 0);
     }
 
+    function test_CompleteCancelJobFlow() public {
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+        uint256 vaultBalanceBefore = cUSD.balanceOf(address(vault));
+
+        bytes32 jobId = _postJob();
+
+        // Verify initial state
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore - BOUNTY);
+        assertEq(cUSD.balanceOf(address(vault)), vaultBalanceBefore + BOUNTY);
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
+
+        // Cancel the job
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify final state
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore);
+        assertEq(cUSD.balanceOf(address(vault)), vaultBalanceBefore);
+        assertEq(vault.getLockedAmount(jobId), 0);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.CANCELLED));
+    }
+
     function test_RefundFromDisputedState() public {
         bytes32 jobId = _postAcceptAndSubmit();
 
