@@ -260,6 +260,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithOneSecondOverBuffer() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline 1 second more than 1 hour should succeed
+        uint40 oneSecondOver = uint40(block.timestamp + 1 hours + 1 seconds);
+
+        bytes32 jobId = registry.postJob("Just enough time", "ipfs://QmCriteriaHash", BOUNTY, oneSecondOver);
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deadline, oneSecondOver);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
