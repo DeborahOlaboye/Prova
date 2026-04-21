@@ -241,6 +241,22 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithVariousIPFSFormats() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Test different valid IPFS hash formats
+        bytes32 jobId1 = registry.postJob("Job 1", "ipfs://QmHash123", BOUNTY, uint40(block.timestamp + DEADLINE));
+        bytes32 jobId2 = registry.postJob("Job 2", "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job1 = registry.getJob(jobId1);
+        JobRegistry.Job memory job2 = registry.getJob(jobId2);
+
+        assertEq(job1.criteriaIPFSHash, "ipfs://QmHash123");
+        assertEq(job2.criteriaIPFSHash, "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
