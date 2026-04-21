@@ -203,6 +203,30 @@ contract JobRegistryTest is Test {
         registry.cancelJob(jobId);
     }
 
+    function test_MultipleJobCancellationsWithRefunds() public {
+        // Post multiple jobs
+        bytes32 jobId1 = _postJob();
+        bytes32 jobId2 = _postJob();
+
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+        uint256 totalLocked = BOUNTY * 2;
+
+        // Cancel both jobs
+        vm.startPrank(client);
+        registry.cancelJob(jobId1);
+        registry.cancelJob(jobId2);
+        vm.stopPrank();
+
+        // Verify both jobs cancelled
+        assertEq(uint8(registry.getJob(jobId1).status), uint8(JobRegistry.JobStatus.CANCELLED));
+        assertEq(uint8(registry.getJob(jobId2).status), uint8(JobRegistry.JobStatus.CANCELLED));
+
+        // Verify both refunds received
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore + totalLocked);
+        assertEq(vault.getLockedAmount(jobId1), 0);
+        assertEq(vault.getLockedAmount(jobId2), 0);
+    }
+
     function test_CannotCancelInProgressJob() public {
         bytes32 jobId = _postAndAcceptJob();
 
