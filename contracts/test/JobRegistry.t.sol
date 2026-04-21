@@ -246,6 +246,24 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_SecondCancelDoesNotAffectFirstRefund() public {
+        bytes32 jobId1 = _postJob();
+        bytes32 jobId2 = _postJob();
+
+        vm.startPrank(client);
+
+        // Cancel first job
+        registry.cancelJob(jobId1);
+        assertEq(vault.getLockedAmount(jobId1), 0);
+        assertEq(vault.getLockedAmount(jobId2), BOUNTY);
+
+        // Cancel second job
+        registry.cancelJob(jobId2);
+        assertEq(vault.getLockedAmount(jobId2), 0);
+
+        vm.stopPrank();
+    }
+
     function test_CancelledJobRemovedFromOpenJobIds() public {
         bytes32 jobId = _postJob();
 
