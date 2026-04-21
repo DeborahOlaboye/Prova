@@ -117,6 +117,16 @@ contract EscrowVaultTest is Test {
         assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
     }
 
+    function test_RefundOnCancelEmitsFundsRefundedEvent() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectEmit(true, true, false, true);
+        emit EscrowVault.FundsRefunded(jobId, client, BOUNTY);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+    }
+
     function test_RefundFromDisputedState() public {
         bytes32 jobId = _postAcceptAndSubmit();
 
