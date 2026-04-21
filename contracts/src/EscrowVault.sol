@@ -99,6 +99,8 @@ contract EscrowVault {
 
     /// @notice Refund bounty to client when job is cancelled by client.
     /// @dev Only callable by JobRegistry during cancelJob operation.
+    /// @param jobId The ID of the job being cancelled.
+    /// @custom:access Only callable by JobRegistry contract.
     function refundOnCancel(bytes32 jobId) external {
         if (msg.sender != address(jobRegistry)) revert Unauthorized();
 
