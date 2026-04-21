@@ -205,6 +205,18 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithLongTitle() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        string memory longTitle = "This is a very long job title that describes the work in great detail and should still be accepted by the contract validation";
+        bytes32 jobId = registry.postJob(longTitle, "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, longTitle);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
