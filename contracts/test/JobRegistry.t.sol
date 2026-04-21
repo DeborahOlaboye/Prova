@@ -270,6 +270,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithEmptyDeliverableOnSubmission() public {
+        // Note: deliverable is set during submission, not posting
+        // This test verifies that empty deliverable check is handled at submission time
+        bytes32 jobId = _postAndAcceptJob();
+
+        vm.prank(freelancer);
+        // Empty deliverable should be allowed at contract level (validated by agent off-chain)
+        registry.submitWork(jobId, "");
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deliverableIPFSHash, "");
+        assertEq(uint8(job.status), uint8(JobRegistry.JobStatus.SUBMITTED));
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
