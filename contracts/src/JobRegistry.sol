@@ -105,6 +105,7 @@ contract JobRegistry {
         if (bounty < MIN_BOUNTY) revert BountyTooLow();
         if (deadline <= block.timestamp) revert InvalidDeadline();
         if (bytes(title).length == 0) revert EmptyTitle();
+        if (bytes(criteriaIPFSHash).length == 0) revert EmptyCriteria();
 
         jobId = keccak256(
             abi.encodePacked(msg.sender, title, block.timestamp, bounty)
