@@ -127,6 +127,20 @@ contract EscrowVaultTest is Test {
         registry.cancelJob(jobId);
     }
 
+    function test_VaultBalanceAfterCancelRefund() public {
+        uint256 vaultBalanceBefore = cUSD.balanceOf(address(vault));
+        bytes32 jobId = _postJob();
+
+        uint256 vaultBalanceAfterPost = cUSD.balanceOf(address(vault));
+        assertEq(vaultBalanceAfterPost, vaultBalanceBefore + BOUNTY);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        uint256 vaultBalanceAfterCancel = cUSD.balanceOf(address(vault));
+        assertEq(vaultBalanceAfterCancel, vaultBalanceBefore);
+    }
+
     function test_RefundFromDisputedState() public {
         bytes32 jobId = _postAcceptAndSubmit();
 
