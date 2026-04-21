@@ -45,6 +45,9 @@ contract JobRegistry {
     bytes32[] public openJobIds;
 
     uint256 public constant MIN_BOUNTY = 1e13; // 0.00001 cUSD minimum
+    /// @notice Minimum time buffer between job posting and deadline
+    /// @dev Prevents clients from posting jobs with unreasonably short deadlines
+    uint256 public constant MIN_DEADLINE_BUFFER = 1 hours; // Minimum time until deadline
 
     event JobPosted(bytes32 indexed jobId, address indexed client, uint256 bounty, uint40 deadline);
     event JobAccepted(bytes32 indexed jobId, address indexed freelancer);
@@ -65,6 +68,8 @@ contract JobRegistry {
     error DeadlinePassed();
     error AlreadyAccepted();
     error InvalidDeadline();
+    /// @notice Thrown when deadline is sooner than minimum buffer time
+    error DeadlineTooSoon();
     error VaultAlreadySet();
     /// @notice Thrown when job title is empty
     error EmptyTitle();
