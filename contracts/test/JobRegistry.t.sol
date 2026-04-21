@@ -300,6 +300,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_EmptyTitleRevertsEarly() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        uint256 gasBefore = gasleft();
+        vm.expectRevert(JobRegistry.EmptyTitle.selector);
+        registry.postJob("", "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Empty string validation should revert early with minimal gas
+        assertLt(gasUsed, 50000, "Empty title should revert with minimal gas");
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
