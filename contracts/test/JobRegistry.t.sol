@@ -181,6 +181,21 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithLongerDeadline() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline 7 days from now should succeed (well above minimum)
+        uint40 futureDeadline = uint40(block.timestamp + 7 days);
+
+        bytes32 jobId = registry.postJob("Complex project", "ipfs://QmCriteriaHash", BOUNTY, futureDeadline);
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deadline, futureDeadline);
+        assertEq(uint8(job.status), uint8(JobRegistry.JobStatus.OPEN));
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
