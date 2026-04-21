@@ -141,6 +141,19 @@ contract EscrowVaultTest is Test {
         assertEq(vaultBalanceAfterCancel, vaultBalanceBefore);
     }
 
+    function test_LockedFundsZeroAfterCancel() public {
+        bytes32 jobId = _postJob();
+
+        // Verify funds are locked
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify locked funds are now zero
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
     function test_RefundFromDisputedState() public {
         bytes32 jobId = _postAcceptAndSubmit();
 
