@@ -328,6 +328,25 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function testFuzz_ValidTitleLengths(uint8 length) public {
+        vm.assume(length > 0 && length <= 100);
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Generate a title of specified length
+        bytes memory titleBytes = new bytes(length);
+        for (uint8 i = 0; i < length; i++) {
+            titleBytes[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
+        }
+        string memory title = string(titleBytes);
+
+        bytes32 jobId = registry.postJob(title, "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, title);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
