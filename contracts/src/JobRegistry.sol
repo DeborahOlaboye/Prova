@@ -66,6 +66,8 @@ contract JobRegistry {
     error AlreadyAccepted();
     error InvalidDeadline();
     error VaultAlreadySet();
+    error EmptyTitle();
+    error EmptyCriteria();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert Unauthorized();
