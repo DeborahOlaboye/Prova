@@ -196,7 +196,9 @@ contract JobRegistry {
         emit JobRefunded(jobId);
     }
 
-    /// @notice Client cancels an open job and gets refund.
+    /// @notice Client cancels an open job and receives a full refund of the bounty.
+    /// @dev Only the client who posted the job can cancel it. Refunds are processed through EscrowVault.
+    /// @param jobId The ID of the job to cancel.
     function cancelJob(bytes32 jobId) external {
         Job storage j = _jobs[jobId];
         if (j.client != msg.sender) revert Unauthorized();
