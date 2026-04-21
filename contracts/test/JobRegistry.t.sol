@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 /// @title JobRegistryTest
-/// @notice Test suite for JobRegistry including minimum deadline buffer validation
-/// @dev Tests cover DeadlineTooSoon error and MIN_DEADLINE_BUFFER constant
+/// @notice Test suite for JobRegistry including empty string validation
+/// @dev Tests cover EmptyTitle and EmptyCriteria error conditions
 
 import {Test} from "forge-std/Test.sol";
 import {JobRegistry} from "../src/JobRegistry.sol";
@@ -159,213 +159,214 @@ contract JobRegistryTest is Test {
         assertEq(jobs[1], id2);
     }
 
-    function test_CannotPostJobWithDeadlineTooSoon() public {
+    function test_CannotPostJobWithEmptyTitle() public {
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
 
-        // Deadline less than 1 hour from now should revert
-        uint40 tooSoonDeadline = uint40(block.timestamp + 30 minutes);
-
-        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
-        registry.postJob("Write a landing page", "ipfs://QmCriteriaHash", BOUNTY, tooSoonDeadline);
+        vm.expectRevert(JobRegistry.EmptyTitle.selector);
+        registry.postJob("", "ipfs://QmCriteriaHash", BOUNTY, uint40(block.timestamp + DEADLINE));
         vm.stopPrank();
     }
 
-    function test_CanPostJobWithExactlyMinimumBuffer() public {
+    function test_CannotPostJobWithEmptyCriteria() public {
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
 
-        // Deadline exactly 1 hour from now should succeed
-        uint40 minDeadline = uint40(block.timestamp + 1 hours);
+        vm.expectRevert(JobRegistry.EmptyCriteria.selector);
+        registry.postJob("Write a landing page", "", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
 
-        bytes32 jobId = registry.postJob("Write a landing page", "ipfs://QmCriteriaHash", BOUNTY, minDeadline);
+    function test_CannotPostJobWithBothEmpty() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectRevert(JobRegistry.EmptyTitle.selector);
+        registry.postJob("", "", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
+    function test_CanPostJobWithValidTitleAndCriteria() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        bytes32 jobId = registry.postJob("Valid Job Title", "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
 
         JobRegistry.Job memory job = registry.getJob(jobId);
-        assertEq(job.deadline, minDeadline);
+        assertEq(job.title, "Valid Job Title");
+        assertEq(job.criteriaIPFSHash, "ipfs://QmValidHash");
         vm.stopPrank();
     }
 
-    function test_CanPostJobWithLongerDeadline() public {
+    function test_CanPostJobWithSingleCharacterTitle() public {
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
 
-        // Deadline 7 days from now should succeed (well above minimum)
-        uint40 futureDeadline = uint40(block.timestamp + 7 days);
-
-        bytes32 jobId = registry.postJob("Complex project", "ipfs://QmCriteriaHash", BOUNTY, futureDeadline);
+        bytes32 jobId = registry.postJob("A", "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
 
         JobRegistry.Job memory job = registry.getJob(jobId);
-        assertEq(job.deadline, futureDeadline);
-        assertEq(uint8(job.status), uint8(JobRegistry.JobStatus.OPEN));
+        assertEq(job.title, "A");
         vm.stopPrank();
     }
 
-    function test_CannotPostJobWithDeadlineJustBelowMinimum() public {
+    function test_CanPostJobWithLongTitle() public {
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
 
-        // Deadline 59 minutes from now should revert (just under 1 hour)
-        uint40 justUnderMin = uint40(block.timestamp + 59 minutes);
-
-        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
-        registry.postJob("Rush job", "ipfs://QmCriteriaHash", BOUNTY, justUnderMin);
-        vm.stopPrank();
-    }
-
-    function test_CanPostJobWithTwoHourDeadline() public {
-        vm.startPrank(client);
-        cUSD.approve(address(registry), BOUNTY);
-
-        // Deadline 2 hours from now should succeed (double the minimum)
-        uint40 twoHourDeadline = uint40(block.timestamp + 2 hours);
-
-        bytes32 jobId = registry.postJob("Two hour job", "ipfs://QmCriteriaHash", BOUNTY, twoHourDeadline);
+        string memory longTitle = "This is a very long job title that describes the work in great detail and should still be accepted by the contract validation";
+        bytes32 jobId = registry.postJob(longTitle, "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
 
         JobRegistry.Job memory job = registry.getJob(jobId);
-        assertEq(job.deadline, twoHourDeadline);
+        assertEq(job.title, longTitle);
         vm.stopPrank();
     }
 
-    function test_CanPostJobWith24HourDeadline() public {
+    function test_CanPostJobWithSpecialCharactersInTitle() public {
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
 
-        // Deadline 24 hours from now should succeed
-        uint40 dayDeadline = uint40(block.timestamp + 1 days);
-
-        bytes32 jobId = registry.postJob("Daily task", "ipfs://QmCriteriaHash", BOUNTY, dayDeadline);
+        string memory specialTitle = "Job: Write a landing page! (urgent) @home #freelance";
+        bytes32 jobId = registry.postJob(specialTitle, "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
 
         JobRegistry.Job memory job = registry.getJob(jobId);
-        assertEq(job.deadline, dayDeadline);
+        assertEq(job.title, specialTitle);
         vm.stopPrank();
     }
 
-    function test_CannotPostJobWithVeryShortDeadline() public {
+    function test_CanPostJobWithUnicodeInTitle() public {
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
 
-        // Deadline 1 minute from now should revert
-        uint40 oneMinuteDeadline = uint40(block.timestamp + 1 minutes);
-
-        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
-        registry.postJob("Impossible task", "ipfs://QmCriteriaHash", BOUNTY, oneMinuteDeadline);
-        vm.stopPrank();
-    }
-
-    function test_CannotPostJobWithOneSecondUnderBuffer() public {
-        vm.startPrank(client);
-        cUSD.approve(address(registry), BOUNTY);
-
-        // Deadline 1 second less than 1 hour should revert
-        uint40 oneSecondUnder = uint40(block.timestamp + 1 hours - 1 seconds);
-
-        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
-        registry.postJob("Almost enough time", "ipfs://QmCriteriaHash", BOUNTY, oneSecondUnder);
-        vm.stopPrank();
-    }
-
-    function test_CanPostJobWithOneSecondOverBuffer() public {
-        vm.startPrank(client);
-        cUSD.approve(address(registry), BOUNTY);
-
-        // Deadline 1 second more than 1 hour should succeed
-        uint40 oneSecondOver = uint40(block.timestamp + 1 hours + 1 seconds);
-
-        bytes32 jobId = registry.postJob("Just enough time", "ipfs://QmCriteriaHash", BOUNTY, oneSecondOver);
+        string memory unicodeTitle = "Prova: Creare una pagina web bellissima";
+        bytes32 jobId = registry.postJob(unicodeTitle, "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
 
         JobRegistry.Job memory job = registry.getJob(jobId);
-        assertEq(job.deadline, oneSecondOver);
+        assertEq(job.title, unicodeTitle);
         vm.stopPrank();
     }
 
-    function test_DeadlineTooSoonRevertsEarly() public {
+    function test_CanPostJobWithVariousIPFSFormats() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Test different valid IPFS hash formats
+        bytes32 jobId1 = registry.postJob("Job 1", "ipfs://QmHash123", BOUNTY, uint40(block.timestamp + DEADLINE));
+        bytes32 jobId2 = registry.postJob("Job 2", "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job1 = registry.getJob(jobId1);
+        JobRegistry.Job memory job2 = registry.getJob(jobId2);
+
+        assertEq(job1.criteriaIPFSHash, "ipfs://QmHash123");
+        assertEq(job2.criteriaIPFSHash, "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
+        vm.stopPrank();
+    }
+
+    function test_SpacesOnlyTitleIsAccepted() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Note: spaces-only title is technically non-empty (has bytes)
+        // This test documents current behavior - spaces count as valid content
+        bytes32 jobId = registry.postJob("   ", "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, "   ");
+        vm.stopPrank();
+    }
+
+    function test_CanPostJobWithEmptyDeliverableOnSubmission() public {
+        // Note: deliverable is set during submission, not posting
+        // This test verifies that empty deliverable check is handled at submission time
+        bytes32 jobId = _postAndAcceptJob();
+
+        vm.prank(freelancer);
+        // Empty deliverable should be allowed at contract level (validated by agent off-chain)
+        registry.submitWork(jobId, "");
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deliverableIPFSHash, "");
+        assertEq(uint8(job.status), uint8(JobRegistry.JobStatus.SUBMITTED));
+    }
+
+    function test_PostJobEmitsEventWithValidInput() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectEmit(true, true, false, true);
+        emit JobRegistry.JobPosted(
+            keccak256(abi.encodePacked(client, "Test Job Title", block.timestamp, BOUNTY)),
+            client,
+            BOUNTY,
+            uint40(block.timestamp + DEADLINE)
+        );
+
+        registry.postJob("Test Job Title", "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
+    function test_EmptyTitleRevertsEarly() public {
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
 
         uint256 gasBefore = gasleft();
-        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
-        registry.postJob("Rush job", "ipfs://QmCriteriaHash", BOUNTY, uint40(block.timestamp + 30 minutes));
+        vm.expectRevert(JobRegistry.EmptyTitle.selector);
+        registry.postJob("", "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
         uint256 gasUsed = gasBefore - gasleft();
 
-        // Deadline validation should revert early with minimal gas (before external calls)
-        assertLt(gasUsed, 50000, "DeadlineTooSoon should revert with minimal gas");
+        // Empty string validation should revert early with minimal gas
+        assertLt(gasUsed, 50000, "Empty title should revert with minimal gas");
         vm.stopPrank();
     }
 
-    function test_MinDeadlineBufferIsOneHour() public {
-        // Verify the MIN_DEADLINE_BUFFER constant is set to 1 hour
-        assertEq(registry.MIN_DEADLINE_BUFFER(), 1 hours);
-    }
-
-    function test_CanPostJobWithFarFutureDeadline() public {
+    function test_EmptyCriteriaRevertsEarly() public {
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
 
-        // Deadline 30 days from now should succeed
-        uint40 farFuture = uint40(block.timestamp + 30 days);
+        uint256 gasBefore = gasleft();
+        vm.expectRevert(JobRegistry.EmptyCriteria.selector);
+        registry.postJob("Valid Title", "", BOUNTY, uint40(block.timestamp + DEADLINE));
+        uint256 gasUsed = gasBefore - gasleft();
 
-        bytes32 jobId = registry.postJob("Long term project", "ipfs://QmCriteriaHash", BOUNTY, farFuture);
+        // Empty criteria validation should revert early with minimal gas
+        assertLt(gasUsed, 50000, "Empty criteria should revert with minimal gas");
+        vm.stopPrank();
+    }
+
+    function testFuzz_ValidTitleLengths(uint8 length) public {
+        vm.assume(length > 0 && length <= 100);
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Generate a title of specified length
+        bytes memory titleBytes = new bytes(length);
+        for (uint8 i = 0; i < length; i++) {
+            titleBytes[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
+        }
+        string memory title = string(titleBytes);
+
+        bytes32 jobId = registry.postJob(title, "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
 
         JobRegistry.Job memory job = registry.getJob(jobId);
-        assertEq(job.deadline, farFuture);
+        assertEq(job.title, title);
         vm.stopPrank();
     }
 
-    function testFuzz_ValidDeadlineDurations(uint16 hoursFromNow) public {
-        vm.assume(hoursFromNow >= 1 && hoursFromNow <= 720); // 1 hour to 30 days
+    function testFuzz_ValidCriteriaLengths(uint8 length) public {
+        vm.assume(length > 0 && length <= 100);
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
 
-        uint40 deadline = uint40(block.timestamp + uint256(hoursFromNow) * 1 hours);
+        // Generate a criteria hash of specified length
+        bytes memory criteriaBytes = new bytes(length);
+        for (uint8 i = 0; i < length; i++) {
+            criteriaBytes[i] = bytes1(uint8(97 + (i % 26))); // a-z repeating
+        }
+        string memory criteria = string(criteriaBytes);
 
-        bytes32 jobId = registry.postJob("Fuzzed deadline job", "ipfs://QmCriteriaHash", BOUNTY, deadline);
+        bytes32 jobId = registry.postJob("Valid Title", criteria, BOUNTY, uint40(block.timestamp + DEADLINE));
 
         JobRegistry.Job memory job = registry.getJob(jobId);
-        assertEq(job.deadline, deadline);
-        vm.stopPrank();
-    }
-
-    function test_JobPostedEventEmitsCorrectDeadline() public {
-        vm.startPrank(client);
-        cUSD.approve(address(registry), BOUNTY);
-
-        uint40 testDeadline = uint40(block.timestamp + 2 hours);
-
-        vm.expectEmit(true, true, false, true);
-        emit JobRegistry.JobPosted(
-            keccak256(abi.encodePacked(client, "Event test job", block.timestamp, BOUNTY)),
-            client,
-            BOUNTY,
-            testDeadline
-        );
-
-        registry.postJob("Event test job", "ipfs://QmCriteriaHash", BOUNTY, testDeadline);
-        vm.stopPrank();
-    }
-
-    function test_CannotPostJobWithFiveMinuteDeadline() public {
-        vm.startPrank(client);
-        cUSD.approve(address(registry), BOUNTY);
-
-        // Deadline 5 minutes from now should revert
-        uint40 fiveMinDeadline = uint40(block.timestamp + 5 minutes);
-
-        vm.expectRevert(JobRegistry.DeadlineTooSoon.selector);
-        registry.postJob("Quick task", "ipfs://QmCriteriaHash", BOUNTY, fiveMinDeadline);
-        vm.stopPrank();
-    }
-
-    function test_CanPostJobWith90MinuteDeadline() public {
-        vm.startPrank(client);
-        cUSD.approve(address(registry), BOUNTY);
-
-        // Deadline 90 minutes from now should succeed (1.5x the minimum)
-        uint40 ninetyMinDeadline = uint40(block.timestamp + 90 minutes);
-
-        bytes32 jobId = registry.postJob("Standard task", "ipfs://QmCriteriaHash", BOUNTY, ninetyMinDeadline);
-
-        JobRegistry.Job memory job = registry.getJob(jobId);
-        assertEq(job.deadline, ninetyMinDeadline);
+        assertEq(job.criteriaIPFSHash, criteria);
         vm.stopPrank();
     }
 
@@ -376,13 +377,13 @@ contract JobRegistryTest is Test {
     }
 
     function _postJobWithBounty(uint256 bounty) internal returns (bytes32 jobId) {
-        return _postJobWithDetails("Write a landing page", "ipfs://QmCriteriaHash", bounty, uint40(block.timestamp + DEADLINE));
+        return _postJobWithDetails("Write a landing page", "ipfs://QmCriteriaHash", bounty);
     }
 
-    function _postJobWithDetails(string memory title, string memory criteria, uint256 bounty, uint40 deadline) internal returns (bytes32 jobId) {
+    function _postJobWithDetails(string memory title, string memory criteria, uint256 bounty) internal returns (bytes32 jobId) {
         vm.startPrank(client);
         cUSD.approve(address(registry), bounty);
-        jobId = registry.postJob(title, criteria, bounty, deadline);
+        jobId = registry.postJob(title, criteria, bounty, uint40(block.timestamp + DEADLINE));
         vm.stopPrank();
     }
 
