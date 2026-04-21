@@ -173,6 +173,15 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CannotPostJobWithBothEmpty() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectRevert(JobRegistry.EmptyTitle.selector);
+        registry.postJob("", "", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
