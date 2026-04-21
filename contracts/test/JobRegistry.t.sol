@@ -164,6 +164,15 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CannotPostJobWithEmptyCriteria() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectRevert(JobRegistry.EmptyCriteria.selector);
+        registry.postJob("Write a landing page", "", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
