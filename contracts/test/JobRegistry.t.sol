@@ -193,6 +193,16 @@ contract JobRegistryTest is Test {
         assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
     }
 
+    function test_CancelJobEmitsJobCancelledEvent() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectEmit(true, false, false, false);
+        emit JobRegistry.JobCancelled(jobId);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+    }
+
     function test_CannotCancelInProgressJob() public {
         bytes32 jobId = _postAndAcceptJob();
 
