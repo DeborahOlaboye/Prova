@@ -95,6 +95,19 @@ contract EscrowVaultTest is Test {
         vault.releaseFunds(jobId);
     }
 
+    function test_RefundOnCancelOnlyCallableByJobRegistry() public {
+        bytes32 jobId = _postJob();
+
+        // Cancel the job first
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Non-JobRegistry caller should fail
+        vm.expectRevert(EscrowVault.Unauthorized.selector);
+        vm.prank(client);
+        vault.refundOnCancel(jobId);
+    }
+
     function test_RefundFromDisputedState() public {
         bytes32 jobId = _postAcceptAndSubmit();
 
