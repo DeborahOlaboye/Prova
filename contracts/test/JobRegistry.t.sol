@@ -264,6 +264,29 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CancelJobRefundIntegration() public {
+        // Complete integration test for cancel and refund
+        uint256 initialClientBalance = cUSD.balanceOf(client);
+        uint256 initialVaultBalance = cUSD.balanceOf(address(vault));
+
+        bytes32 jobId = _postJob();
+
+        // Verify funds moved from client to vault
+        assertEq(cUSD.balanceOf(client), initialClientBalance - BOUNTY);
+        assertEq(cUSD.balanceOf(address(vault)), initialVaultBalance + BOUNTY);
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+
+        // Cancel and verify refund
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify funds returned to client
+        assertEq(cUSD.balanceOf(client), initialClientBalance);
+        assertEq(cUSD.balanceOf(address(vault)), initialVaultBalance);
+        assertEq(vault.getLockedAmount(jobId), 0);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.CANCELLED));
+    }
+
     function test_CancelledJobRemovedFromOpenJobIds() public {
         bytes32 jobId = _postJob();
 
