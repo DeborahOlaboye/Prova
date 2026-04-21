@@ -66,6 +66,7 @@ contract JobRegistry {
     error DeadlinePassed();
     error AlreadyAccepted();
     error InvalidDeadline();
+    error DeadlineTooSoon();
     error VaultAlreadySet();
 
     modifier onlyOwner() {
