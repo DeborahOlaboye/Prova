@@ -229,6 +229,18 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithUnicodeInTitle() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        string memory unicodeTitle = "Prova: Creare una pagina web bellissima";
+        bytes32 jobId = registry.postJob(unicodeTitle, "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, unicodeTitle);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
