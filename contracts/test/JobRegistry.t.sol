@@ -307,6 +307,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function testFuzz_ValidDeadlineDurations(uint16 hoursFromNow) public {
+        vm.assume(hoursFromNow >= 1 && hoursFromNow <= 720); // 1 hour to 30 days
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        uint40 deadline = uint40(block.timestamp + uint256(hoursFromNow) * 1 hours);
+
+        bytes32 jobId = registry.postJob("Fuzzed deadline job", "ipfs://QmCriteriaHash", BOUNTY, deadline);
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deadline, deadline);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
