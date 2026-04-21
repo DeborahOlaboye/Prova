@@ -158,6 +158,24 @@ contract JobRegistryTest is Test {
         registry.cancelJob(jobId);
     }
 
+    function test_CancelJobRefundsDifferentBountyAmounts() public {
+        // Test with 5 cUSD bounty
+        uint256 customBounty = 5e18;
+        vm.startPrank(client);
+        cUSD.approve(address(registry), customBounty);
+
+        uint40 deadline = uint40(block.timestamp + 7 days);
+        bytes32 jobId = registry.postJob("Custom bounty job", "ipfs://QmCriteria", customBounty, deadline);
+
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+
+        registry.cancelJob(jobId);
+
+        // Verify full custom bounty is refunded
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore + customBounty);
+        vm.stopPrank();
+    }
+
     function test_CannotCancelInProgressJob() public {
         bytes32 jobId = _postAndAcceptJob();
 
