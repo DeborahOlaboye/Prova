@@ -288,6 +288,11 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_MinDeadlineBufferIsOneHour() public {
+        // Verify the MIN_DEADLINE_BUFFER constant is set to 1 hour
+        assertEq(registry.MIN_DEADLINE_BUFFER(), 1 hours);
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
