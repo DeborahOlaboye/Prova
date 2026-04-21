@@ -45,6 +45,7 @@ contract JobRegistry {
     bytes32[] public openJobIds;
 
     uint256 public constant MIN_BOUNTY = 1e13; // 0.00001 cUSD minimum
+    uint256 public constant MIN_DEADLINE_BUFFER = 1 hours; // Minimum time until deadline
 
     event JobPosted(bytes32 indexed jobId, address indexed client, uint256 bounty, uint40 deadline);
     event JobAccepted(bytes32 indexed jobId, address indexed freelancer);
