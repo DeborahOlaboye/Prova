@@ -68,6 +68,7 @@ contract JobRegistry {
     error DeadlinePassed();
     error AlreadyAccepted();
     error InvalidDeadline();
+    /// @notice Thrown when deadline is sooner than minimum buffer time
     error DeadlineTooSoon();
     error VaultAlreadySet();
 
