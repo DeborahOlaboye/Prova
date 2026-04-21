@@ -176,6 +176,23 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_OnlyClientCanCancelAndGetRefund() public {
+        bytes32 jobId = _postJob();
+
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+        uint256 freelancerBalanceBefore = cUSD.balanceOf(freelancer);
+
+        // Freelancer tries to cancel - should revert
+        vm.expectRevert(JobRegistry.Unauthorized.selector);
+        vm.prank(freelancer);
+        registry.cancelJob(jobId);
+
+        // Verify no funds moved
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore);
+        assertEq(cUSD.balanceOf(freelancer), freelancerBalanceBefore);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
+    }
+
     function test_CannotCancelInProgressJob() public {
         bytes32 jobId = _postAndAcceptJob();
 
