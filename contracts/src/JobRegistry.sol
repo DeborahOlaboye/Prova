@@ -205,6 +205,12 @@ contract JobRegistry {
         j.status = JobStatus.CANCELLED;
         _removeFromOpenJobs(jobId);
 
+        // Refund the bounty to the client
+        (bool ok,) = escrowVault.call(
+            abi.encodeWithSignature("refundOnCancel(bytes32)", jobId)
+        );
+        require(ok, "refundOnCancel failed");
+
         emit JobCancelled(jobId);
     }
 
