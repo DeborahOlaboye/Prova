@@ -167,6 +167,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithExactlyMinimumBuffer() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline exactly 1 hour from now should succeed
+        uint40 minDeadline = uint40(block.timestamp + 1 hours);
+
+        bytes32 jobId = registry.postJob("Write a landing page", "ipfs://QmCriteriaHash", BOUNTY, minDeadline);
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deadline, minDeadline);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
