@@ -189,14 +189,13 @@ contract JobRegistryTest is Test {
     }
 
     function _postJobWithBounty(uint256 bounty) internal returns (bytes32 jobId) {
+        return _postJobWithDetails("Write a landing page", "ipfs://QmCriteriaHash", bounty);
+    }
+
+    function _postJobWithDetails(string memory title, string memory criteria, uint256 bounty) internal returns (bytes32 jobId) {
         vm.startPrank(client);
         cUSD.approve(address(registry), bounty);
-        jobId = registry.postJob(
-            "Write a landing page",
-            "ipfs://QmCriteriaHash",
-            bounty,
-            uint40(block.timestamp + DEADLINE)
-        );
+        jobId = registry.postJob(title, criteria, bounty, uint40(block.timestamp + DEADLINE));
         vm.stopPrank();
     }
 
