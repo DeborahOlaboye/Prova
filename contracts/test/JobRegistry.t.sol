@@ -347,6 +347,25 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function testFuzz_ValidCriteriaLengths(uint8 length) public {
+        vm.assume(length > 0 && length <= 100);
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Generate a criteria hash of specified length
+        bytes memory criteriaBytes = new bytes(length);
+        for (uint8 i = 0; i < length; i++) {
+            criteriaBytes[i] = bytes1(uint8(97 + (i % 26))); // a-z repeating
+        }
+        string memory criteria = string(criteriaBytes);
+
+        bytes32 jobId = registry.postJob("Valid Title", criteria, BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.criteriaIPFSHash, criteria);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
