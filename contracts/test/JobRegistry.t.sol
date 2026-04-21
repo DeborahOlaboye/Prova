@@ -208,6 +208,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithTwoHourDeadline() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline 2 hours from now should succeed (double the minimum)
+        uint40 twoHourDeadline = uint40(block.timestamp + 2 hours);
+
+        bytes32 jobId = registry.postJob("Two hour job", "ipfs://QmCriteriaHash", BOUNTY, twoHourDeadline);
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deadline, twoHourDeadline);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
