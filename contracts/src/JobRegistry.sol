@@ -205,7 +205,8 @@ contract JobRegistry {
         j.status = JobStatus.CANCELLED;
         _removeFromOpenJobs(jobId);
 
-        // Refund the bounty to the client
+        // Refund the bounty to the client via EscrowVault
+        // This ensures locked funds are returned when client cancels
         (bool ok,) = escrowVault.call(
             abi.encodeWithSignature("refundOnCancel(bytes32)", jobId)
         );
