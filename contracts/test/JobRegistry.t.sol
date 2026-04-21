@@ -355,6 +355,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWith90MinuteDeadline() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline 90 minutes from now should succeed (1.5x the minimum)
+        uint40 ninetyMinDeadline = uint40(block.timestamp + 90 minutes);
+
+        bytes32 jobId = registry.postJob("Standard task", "ipfs://QmCriteriaHash", BOUNTY, ninetyMinDeadline);
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deadline, ninetyMinDeadline);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
