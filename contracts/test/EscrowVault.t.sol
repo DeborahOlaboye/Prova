@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @title EscrowVaultTest
+/// @notice Test suite for EscrowVault including cancel job refund functionality
+
 import {Test} from "forge-std/Test.sol";
 import {EscrowVault} from "../src/EscrowVault.sol";
 import {JobRegistry} from "../src/JobRegistry.sol";
