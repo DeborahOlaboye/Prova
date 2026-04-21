@@ -222,6 +222,20 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWith24HourDeadline() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Deadline 24 hours from now should succeed
+        uint40 dayDeadline = uint40(block.timestamp + 1 days);
+
+        bytes32 jobId = registry.postJob("Daily task", "ipfs://QmCriteriaHash", BOUNTY, dayDeadline);
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deadline, dayDeadline);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
