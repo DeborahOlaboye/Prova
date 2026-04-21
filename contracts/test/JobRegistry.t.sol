@@ -227,6 +227,19 @@ contract JobRegistryTest is Test {
         assertEq(vault.getLockedAmount(jobId2), 0);
     }
 
+    function test_CancelledJobRemovedFromOpenJobIds() public {
+        bytes32 jobId = _postJob();
+
+        // Verify job is in openJobIds before cancel
+        assertEq(registry.getOpenJobCount(), 1);
+
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        // Verify job is removed from openJobIds after cancel
+        assertEq(registry.getOpenJobCount(), 0);
+    }
+
     function test_CannotCancelInProgressJob() public {
         bytes32 jobId = _postAndAcceptJob();
 
