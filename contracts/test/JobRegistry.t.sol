@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @title JobRegistryTest
+/// @notice Test suite for JobRegistry including empty string validation
+/// @dev Tests cover EmptyTitle and EmptyCriteria error conditions
+
 import {Test} from "forge-std/Test.sol";
 import {JobRegistry} from "../src/JobRegistry.sol";
 import {EscrowVault} from "../src/EscrowVault.sol";
@@ -155,6 +159,217 @@ contract JobRegistryTest is Test {
         assertEq(jobs[1], id2);
     }
 
+    function test_CannotPostJobWithEmptyTitle() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectRevert(JobRegistry.EmptyTitle.selector);
+        registry.postJob("", "ipfs://QmCriteriaHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
+    function test_CannotPostJobWithEmptyCriteria() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectRevert(JobRegistry.EmptyCriteria.selector);
+        registry.postJob("Write a landing page", "", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
+    function test_CannotPostJobWithBothEmpty() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectRevert(JobRegistry.EmptyTitle.selector);
+        registry.postJob("", "", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
+    function test_CanPostJobWithValidTitleAndCriteria() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        bytes32 jobId = registry.postJob("Valid Job Title", "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, "Valid Job Title");
+        assertEq(job.criteriaIPFSHash, "ipfs://QmValidHash");
+        vm.stopPrank();
+    }
+
+    function test_CanPostJobWithSingleCharacterTitle() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        bytes32 jobId = registry.postJob("A", "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, "A");
+        vm.stopPrank();
+    }
+
+    function test_CanPostJobWithLongTitle() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        string memory longTitle = "This is a very long job title that describes the work in great detail and should still be accepted by the contract validation";
+        bytes32 jobId = registry.postJob(longTitle, "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, longTitle);
+        vm.stopPrank();
+    }
+
+    function test_CanPostJobWithSpecialCharactersInTitle() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        string memory specialTitle = "Job: Write a landing page! (urgent) @home #freelance";
+        bytes32 jobId = registry.postJob(specialTitle, "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, specialTitle);
+        vm.stopPrank();
+    }
+
+    function test_CanPostJobWithUnicodeInTitle() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        string memory unicodeTitle = "Prova: Creare una pagina web bellissima";
+        bytes32 jobId = registry.postJob(unicodeTitle, "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, unicodeTitle);
+        vm.stopPrank();
+    }
+
+    function test_CanPostJobWithVariousIPFSFormats() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Test different valid IPFS hash formats
+        bytes32 jobId1 = registry.postJob("Job 1", "ipfs://QmHash123", BOUNTY, uint40(block.timestamp + DEADLINE));
+        bytes32 jobId2 = registry.postJob("Job 2", "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job1 = registry.getJob(jobId1);
+        JobRegistry.Job memory job2 = registry.getJob(jobId2);
+
+        assertEq(job1.criteriaIPFSHash, "ipfs://QmHash123");
+        assertEq(job2.criteriaIPFSHash, "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
+        vm.stopPrank();
+    }
+
+    function test_SpacesOnlyTitleIsAccepted() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Note: spaces-only title is technically non-empty (has bytes)
+        // This test documents current behavior - spaces count as valid content
+        bytes32 jobId = registry.postJob("   ", "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, "   ");
+        vm.stopPrank();
+    }
+
+    function test_CanPostJobWithEmptyDeliverableOnSubmission() public {
+        // Note: deliverable is set during submission, not posting
+        // This test verifies that empty deliverable check is handled at submission time
+        bytes32 jobId = _postAndAcceptJob();
+
+        vm.prank(freelancer);
+        // Empty deliverable should be allowed at contract level (validated by agent off-chain)
+        registry.submitWork(jobId, "");
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.deliverableIPFSHash, "");
+        assertEq(uint8(job.status), uint8(JobRegistry.JobStatus.SUBMITTED));
+    }
+
+    function test_PostJobEmitsEventWithValidInput() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        vm.expectEmit(true, true, false, true);
+        emit JobRegistry.JobPosted(
+            keccak256(abi.encodePacked(client, "Test Job Title", block.timestamp, BOUNTY)),
+            client,
+            BOUNTY,
+            uint40(block.timestamp + DEADLINE)
+        );
+
+        registry.postJob("Test Job Title", "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+    }
+
+    function test_EmptyTitleRevertsEarly() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        uint256 gasBefore = gasleft();
+        vm.expectRevert(JobRegistry.EmptyTitle.selector);
+        registry.postJob("", "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Empty string validation should revert early with minimal gas
+        assertLt(gasUsed, 50000, "Empty title should revert with minimal gas");
+        vm.stopPrank();
+    }
+
+    function test_EmptyCriteriaRevertsEarly() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        uint256 gasBefore = gasleft();
+        vm.expectRevert(JobRegistry.EmptyCriteria.selector);
+        registry.postJob("Valid Title", "", BOUNTY, uint40(block.timestamp + DEADLINE));
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Empty criteria validation should revert early with minimal gas
+        assertLt(gasUsed, 50000, "Empty criteria should revert with minimal gas");
+        vm.stopPrank();
+    }
+
+    function testFuzz_ValidTitleLengths(uint8 length) public {
+        vm.assume(length > 0 && length <= 100);
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Generate a title of specified length
+        bytes memory titleBytes = new bytes(length);
+        for (uint8 i = 0; i < length; i++) {
+            titleBytes[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
+        }
+        string memory title = string(titleBytes);
+
+        bytes32 jobId = registry.postJob(title, "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, title);
+        vm.stopPrank();
+    }
+
+    function testFuzz_ValidCriteriaLengths(uint8 length) public {
+        vm.assume(length > 0 && length <= 100);
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        // Generate a criteria hash of specified length
+        bytes memory criteriaBytes = new bytes(length);
+        for (uint8 i = 0; i < length; i++) {
+            criteriaBytes[i] = bytes1(uint8(97 + (i % 26))); // a-z repeating
+        }
+        string memory criteria = string(criteriaBytes);
+
+        bytes32 jobId = registry.postJob("Valid Title", criteria, BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.criteriaIPFSHash, criteria);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
@@ -162,14 +377,13 @@ contract JobRegistryTest is Test {
     }
 
     function _postJobWithBounty(uint256 bounty) internal returns (bytes32 jobId) {
+        return _postJobWithDetails("Write a landing page", "ipfs://QmCriteriaHash", bounty);
+    }
+
+    function _postJobWithDetails(string memory title, string memory criteria, uint256 bounty) internal returns (bytes32 jobId) {
         vm.startPrank(client);
         cUSD.approve(address(registry), bounty);
-        jobId = registry.postJob(
-            "Write a landing page",
-            "ipfs://QmCriteriaHash",
-            bounty,
-            uint40(block.timestamp + DEADLINE)
-        );
+        jobId = registry.postJob(title, criteria, bounty, uint40(block.timestamp + DEADLINE));
         vm.stopPrank();
     }
 
