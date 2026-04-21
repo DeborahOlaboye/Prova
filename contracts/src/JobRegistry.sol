@@ -66,7 +66,9 @@ contract JobRegistry {
     error AlreadyAccepted();
     error InvalidDeadline();
     error VaultAlreadySet();
+    /// @notice Thrown when job title is empty
     error EmptyTitle();
+    /// @notice Thrown when criteria IPFS hash is empty
     error EmptyCriteria();
 
     modifier onlyOwner() {
