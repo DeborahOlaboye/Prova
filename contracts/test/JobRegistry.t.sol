@@ -227,6 +227,25 @@ contract JobRegistryTest is Test {
         assertEq(vault.getLockedAmount(jobId2), 0);
     }
 
+    function test_CancelJobRefundsMinimumBounty() public {
+        // Test with minimum bounty (0.00001 cUSD)
+        uint256 minBounty = 1e13;
+        vm.startPrank(client);
+        cUSD.approve(address(registry), minBounty);
+
+        uint40 deadline = uint40(block.timestamp + 7 days);
+        bytes32 jobId = registry.postJob("Minimum bounty job", "ipfs://QmCriteria", minBounty, deadline);
+
+        uint256 clientBalanceBefore = cUSD.balanceOf(client);
+
+        registry.cancelJob(jobId);
+
+        // Verify minimum bounty is fully refunded
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore + minBounty);
+        assertEq(vault.getLockedAmount(jobId), 0);
+        vm.stopPrank();
+    }
+
     function test_CancelledJobRemovedFromOpenJobIds() public {
         bytes32 jobId = _postJob();
 
