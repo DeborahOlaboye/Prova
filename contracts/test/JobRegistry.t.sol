@@ -131,6 +131,8 @@ contract JobRegistryTest is Test {
         registry.cancelJob(jobId);
 
         assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.CANCELLED));
+        // Verify client got their bounty back
+        assertEq(cUSD.balanceOf(client), clientBalanceBefore + BOUNTY);
     }
 
     function test_CannotCancelInProgressJob() public {
