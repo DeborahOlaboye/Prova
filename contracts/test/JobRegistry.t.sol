@@ -217,6 +217,18 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_CanPostJobWithSpecialCharactersInTitle() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+
+        string memory specialTitle = "Job: Write a landing page! (urgent) @home #freelance";
+        bytes32 jobId = registry.postJob(specialTitle, "ipfs://QmValidHash", BOUNTY, uint40(block.timestamp + DEADLINE));
+
+        JobRegistry.Job memory job = registry.getJob(jobId);
+        assertEq(job.title, specialTitle);
+        vm.stopPrank();
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
