@@ -191,6 +191,185 @@ contract EscrowVaultTest is Test {
         assertEq(cUSD.balanceOf(client), clientBefore + BOUNTY);
     }
 
+    // --- status-check fix tests ---
+
+    function test_ReleaseFunds_WorksFromSubmittedStatus() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        // Status is SUBMITTED — must succeed
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+        assertEq(vault.getLockedAmount(jobId), 0);
+        assertEq(cUSD.balanceOf(freelancer), BOUNTY);
+    }
+
+    function test_ReleaseFunds_WorksFromCompletedStatus() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        // Agent marks completed FIRST, then releases — must not revert
+        vm.prank(agent);
+        registry.markCompleted(jobId);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.COMPLETED));
+
+        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        assertEq(cUSD.balanceOf(freelancer), freelancerBefore + BOUNTY);
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
+    function test_ReleaseFunds_RevertsFromOpenStatus() public {
+        bytes32 jobId = _postJob();
+        vm.expectRevert(EscrowVault.JobNotInExpectedState.selector);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+    }
+
+    function test_ReleaseFunds_RevertsFromInProgressStatus() public {
+        bytes32 jobId = _postJob();
+        vm.prank(freelancer);
+        registry.acceptJob(jobId);
+
+        vm.expectRevert(EscrowVault.JobNotInExpectedState.selector);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+    }
+
+    function test_ReleaseFunds_RevertsFromRefundedStatus() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.startPrank(agent);
+        vault.refundFunds(jobId);
+        registry.markRefunded(jobId);
+        vm.stopPrank();
+
+        vm.expectRevert(EscrowVault.NoFundsLocked.selector);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+    }
+
+    function test_ReleaseFunds_RevertsFromDisputedStatus() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        registry.markDisputed(jobId);
+
+        vm.expectRevert(EscrowVault.JobNotInExpectedState.selector);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+    }
+
+    function test_ReleaseFunds_EmitsFundsReleasedEvent() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+
+        vm.expectEmit(true, true, false, true);
+        emit EscrowVault.FundsReleased(jobId, freelancer, BOUNTY);
+
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+    }
+
+    function test_ReleaseFunds_EmitsFundsReleasedEvent_FromCompleted() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        registry.markCompleted(jobId);
+
+        vm.expectEmit(true, true, false, true);
+        emit EscrowVault.FundsReleased(jobId, freelancer, BOUNTY);
+
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+    }
+
+    function test_ReleaseFunds_LockedAmountZeroAfterRelease() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        registry.markCompleted(jobId);
+
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
+    function test_CannotReleaseTwice_FromCompleted() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        registry.markCompleted(jobId);
+
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        vm.expectRevert(EscrowVault.NoFundsLocked.selector);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+    }
+
+    function test_RefundFunds_WorksFromCompletedStatus() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        registry.markCompleted(jobId);
+
+        uint256 clientBefore = cUSD.balanceOf(client);
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+
+        assertEq(cUSD.balanceOf(client), clientBefore + BOUNTY);
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
+    function test_BothOrderings_ReleaseBeforeMarkCompleted() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
+
+        // Order 1: release → markCompleted
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+        vm.prank(agent);
+        registry.markCompleted(jobId);
+
+        assertEq(cUSD.balanceOf(freelancer), freelancerBefore + BOUNTY);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.COMPLETED));
+    }
+
+    function test_BothOrderings_MarkCompletedBeforeRelease() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
+
+        // Order 2: markCompleted → release
+        vm.prank(agent);
+        registry.markCompleted(jobId);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        assertEq(cUSD.balanceOf(freelancer), freelancerBefore + BOUNTY);
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
+    function test_ReleaseFunds_FreelancerReceivesExactBounty() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        registry.markCompleted(jobId);
+
+        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
+        uint256 vaultBefore = cUSD.balanceOf(address(vault));
+
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        assertEq(cUSD.balanceOf(freelancer), freelancerBefore + BOUNTY);
+        assertEq(cUSD.balanceOf(address(vault)), vaultBefore - BOUNTY);
+    }
+
+    function test_ReleaseFunds_ClientBalanceUnchanged() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        registry.markCompleted(jobId);
+
+        uint256 clientBefore = cUSD.balanceOf(client);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        assertEq(cUSD.balanceOf(client), clientBefore);
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32 jobId) {
