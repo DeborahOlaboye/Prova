@@ -1,4 +1,5 @@
 import { Env } from '../lib/types';
+import { withErrorHandling, requireMethod } from '../lib/errors';
 import { sendTransaction, encodeRecordCompletion } from '../lib/chain';
 
 export class ReputationAgent {
@@ -13,8 +14,10 @@ export class ReputationAgent {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method === 'POST' && url.pathname === '/reputation/record') {
-      return this.handleRecord(request);
+    if (url.pathname === '/reputation/record') {
+      const methodErr = requireMethod(request, 'POST');
+      if (methodErr) return methodErr;
+      return withErrorHandling(() => this.handleRecord(request));
     }
 
     return new Response('Not found', { status: 404 });

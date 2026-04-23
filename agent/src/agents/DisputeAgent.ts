@@ -1,4 +1,5 @@
 import { Env, DisputeContext } from '../lib/types';
+import { withErrorHandling, requireMethod } from '../lib/errors';
 import { evaluateWithClaude } from '../lib/claude';
 import { fetchIPFSContent } from '../lib/ipfs';
 import {
@@ -22,12 +23,16 @@ export class DisputeAgent {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method === 'POST' && url.pathname === '/dispute/submit-argument') {
-      return this.handleSubmitArgument(request);
+    if (url.pathname === '/dispute/submit-argument') {
+      const methodErr = requireMethod(request, 'POST');
+      if (methodErr) return methodErr;
+      return withErrorHandling(() => this.handleSubmitArgument(request));
     }
 
-    if (request.method === 'POST' && url.pathname === '/dispute/resolve') {
-      return this.handleResolve(request);
+    if (url.pathname === '/dispute/resolve') {
+      const methodErr = requireMethod(request, 'POST');
+      if (methodErr) return methodErr;
+      return withErrorHandling(() => this.handleResolve(request));
     }
 
     return new Response('Not found', { status: 404 });

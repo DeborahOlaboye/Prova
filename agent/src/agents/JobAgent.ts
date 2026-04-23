@@ -1,4 +1,5 @@
 import { Env, JobEvaluationRequest } from '../lib/types';
+import { withErrorHandling, requireMethod } from '../lib/errors';
 import { evaluateWithClaude } from '../lib/claude';
 import { fetchIPFSContent } from '../lib/ipfs';
 import {
@@ -26,8 +27,10 @@ export class JobAgent {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method === 'POST' && url.pathname === '/evaluate') {
-      return this.handleEvaluate(request);
+    if (url.pathname === '/evaluate') {
+      const methodErr = requireMethod(request, 'POST');
+      if (methodErr) return methodErr;
+      return withErrorHandling(() => this.handleEvaluate(request));
     }
 
     return new Response('Not found', { status: 404 });
