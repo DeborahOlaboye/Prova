@@ -75,6 +75,8 @@ contract JobRegistry {
     error EmptyTitle();
     /// @notice Thrown when criteria IPFS hash is empty
     error EmptyCriteria();
+    /// @notice Thrown when the job client tries to accept their own job
+    error ClientCannotAcceptOwnJob();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert Unauthorized();
@@ -149,9 +151,11 @@ contract JobRegistry {
     }
 
     /// @notice Freelancer accepts an open job.
+    /// @dev The job client is not allowed to accept their own job.
     function acceptJob(bytes32 jobId) external {
         Job storage j = _jobs[jobId];
         if (j.status != JobStatus.OPEN) revert JobNotOpen();
+        if (j.client == msg.sender) revert ClientCannotAcceptOwnJob();
         if (block.timestamp > j.deadline) revert DeadlinePassed();
 
         j.freelancer = msg.sender;
