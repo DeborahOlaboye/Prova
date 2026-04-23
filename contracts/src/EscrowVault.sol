@@ -129,6 +129,8 @@ contract EscrowVault {
     }
 
     /// @notice Escalate to arbiter pool when AI cannot resolve dispute.
+    /// @dev disputeId is derived from jobId and block.timestamp. See issue #10 for
+    ///      collision risk when two disputes are opened in the same block.
     function escalateToArbiters(bytes32 jobId) external onlyAgent returns (bytes32 disputeId) {
         uint256 amount = lockedFunds[jobId];
         if (amount == 0) revert NoFundsLocked();
