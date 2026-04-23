@@ -222,7 +222,7 @@ export default function JobDetailPage() {
         </div>
       )}
 
-      {/* Freelancer: accept open job */}
+      {/* Freelancer: accept open job — hidden for the client who posted it */}
       {!isClient && job.status === JobStatus.OPEN && !expired && (
         <div className="card border-celo-green/20">
           <h2 className="font-semibold mb-3">Accept This Job</h2>
