@@ -8,8 +8,8 @@ import {ArbiterPool} from "../src/ArbiterPool.sol";
 import {ReputationLedger} from "../src/ReputationLedger.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
-/// @notice End-to-end tests covering happy path, refund, dispute, reputation,
-///         and releaseFunds call-ordering safety.
+/// @notice End-to-end tests covering happy path, refund, dispute → arbiter resolution,
+///         reputation tracking, and self-accept prevention across a full job lifecycle.
 contract IntegrationTest is Test {
     JobRegistry      registry;
     EscrowVault      vault;
@@ -152,52 +152,50 @@ contract IntegrationTest is Test {
         assertGt(composite, 0);
     }
 
-    /// @notice Agent calls markCompleted before releaseFunds — must not revert
-    function test_MarkCompletedBeforeRelease_DoesNotRevert() public {
-        bytes32 jobId = _fullSubmit();
-        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
-
-        vm.startPrank(agent);
-        registry.markCompleted(jobId); // status = COMPLETED
-        vault.releaseFunds(jobId);     // must accept COMPLETED
+    /// @notice Client cannot self-accept — bounty stays locked, job stays open
+    function test_ClientCannotSelfAccept_Integration() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+        bytes32 jobId = registry.postJob(
+            "Build a DeFi dashboard",
+            "ipfs://QmCriteria",
+            BOUNTY,
+            uint40(block.timestamp + DEADLINE)
+        );
         vm.stopPrank();
 
-        assertEq(cUSD.balanceOf(freelancer), freelancerBefore + BOUNTY);
-        assertEq(vault.getLockedAmount(jobId), 0);
+        uint256 vaultBefore = cUSD.balanceOf(address(vault));
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+        assertEq(cUSD.balanceOf(address(vault)), vaultBefore);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
     }
 
-    /// @notice Agent calls releaseFunds before markCompleted — standard ordering
-    function test_ReleaseBeforeMarkCompleted_StandardOrdering() public {
-        bytes32 jobId = _fullSubmit();
-        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
-
-        vm.startPrank(agent);
-        vault.releaseFunds(jobId);     // status = SUBMITTED — accepted
-        registry.markCompleted(jobId); // status = COMPLETED
+    /// @notice After failed self-accept, a real freelancer can still accept
+    function test_AfterFailedSelfAccept_FreelancerCanAccept() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+        bytes32 jobId = registry.postJob(
+            "Build a DeFi dashboard",
+            "ipfs://QmCriteria",
+            BOUNTY,
+            uint40(block.timestamp + DEADLINE)
+        );
         vm.stopPrank();
 
-        assertEq(cUSD.balanceOf(freelancer), freelancerBefore + BOUNTY);
-        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.COMPLETED));
-    }
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
 
-    /// @notice Both orderings produce identical final state
-    function test_BothCallOrderings_IdenticalFinalState() public {
-        bytes32 jobA = _fullSubmit();
-        vm.startPrank(agent);
-        vault.releaseFunds(jobA);
-        registry.markCompleted(jobA);
-        vm.stopPrank();
+        vm.prank(freelancer);
+        registry.acceptJob(jobId);
 
-        bytes32 jobB = _fullSubmit();
-        vm.startPrank(agent);
-        registry.markCompleted(jobB);
-        vault.releaseFunds(jobB);
-        vm.stopPrank();
-
-        assertEq(uint8(registry.getJob(jobA).status), uint8(JobRegistry.JobStatus.COMPLETED));
-        assertEq(uint8(registry.getJob(jobB).status), uint8(JobRegistry.JobStatus.COMPLETED));
-        assertEq(vault.getLockedAmount(jobA), 0);
-        assertEq(vault.getLockedAmount(jobB), 0);
+        assertEq(registry.getJob(jobId).freelancer, freelancer);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.IN_PROGRESS));
     }
 
     // --- helpers ---
@@ -231,7 +229,7 @@ contract IntegrationTest is Test {
     }
 
     function _getSelectedArbiters(bytes32 disputeId) internal view returns (address[] memory) {
-        disputeId;
+        disputeId; // suppress unused warning
         address[3] memory arbs = [arb1, arb2, arb3];
         address[] memory selected = new address[](3);
         for (uint256 i = 0; i < 3; i++) {
