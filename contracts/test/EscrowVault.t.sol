@@ -646,10 +646,33 @@ contract EscrowVaultTest is Test {
         cUSD.approve(address(registry), BOUNTY);
         jobId = registry.postJob(title, "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
         vm.stopPrank();
-        vm.warp(block.timestamp + 1); // ensure unique timestamp → unique jobId
+        vm.warp(block.timestamp + 1);
         vm.prank(freelancer);
         registry.acceptJob(jobId);
         vm.prank(freelancer);
         registry.submitWork(jobId, "ipfs://QmDeliverable");
+    }
+
+    function test_ExecuteArbiterDecision_OnlyArbiterPool() public {
+        vm.expectRevert(EscrowVault.Unauthorized.selector);
+        vm.prank(agent);
+        vault.executeArbiterDecision(bytes32("disputeId"));
+    }
+
+    function test_EscalateToArbiters_OnlyAgent() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        registry.markDisputed(jobId);
+
+        vm.expectRevert(EscrowVault.Unauthorized.selector);
+        vm.prank(client);
+        vault.escalateToArbiters(jobId);
+    }
+
+    function test_EscalateToArbiters_RevertsIfNoFundsLocked() public {
+        bytes32 nonExistent = keccak256("ghost");
+        vm.expectRevert(EscrowVault.NoFundsLocked.selector);
+        vm.prank(agent);
+        vault.escalateToArbiters(nonExistent);
     }
 }
