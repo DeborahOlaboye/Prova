@@ -697,6 +697,24 @@ contract JobRegistryTest is Test {
         assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.IN_PROGRESS));
     }
 
+    function test_ClientCannotAcceptOwnJob_EventNotEmitted() public {
+        bytes32 jobId = _postJob();
+
+        // Record logs before the failed call
+        vm.recordLogs();
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // No JobAccepted event should have been emitted
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            // JobAccepted topic: keccak256("JobAccepted(bytes32,address)")
+            bytes32 jobAcceptedTopic = keccak256("JobAccepted(bytes32,address)");
+            assertTrue(logs[i].topics[0] != jobAcceptedTopic, "JobAccepted must not be emitted");
+        }
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
