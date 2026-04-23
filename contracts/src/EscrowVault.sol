@@ -144,6 +144,8 @@ contract EscrowVault {
     }
 
     /// @notice Called by ArbiterPool after voting concludes to execute the decision.
+    /// @dev Transfers funds to freelancer on RELEASED outcome, to client on REFUNDED outcome.
+    ///      Clears lockedFunds before transfer to prevent re-entrancy.
     function executeArbiterDecision(bytes32 disputeId) external {
         if (msg.sender != address(arbiterPool)) revert Unauthorized();
 
