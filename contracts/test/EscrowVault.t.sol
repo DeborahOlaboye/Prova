@@ -370,6 +370,125 @@ contract EscrowVaultTest is Test {
         assertEq(cUSD.balanceOf(client), clientBefore);
     }
 
+    function test_ReleaseFunds_RevertsFromCancelledStatus() public {
+        bytes32 jobId = _postJob();
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        vm.expectRevert(EscrowVault.NoFundsLocked.selector);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+    }
+
+    function test_RefundFunds_RevertsFromOpenStatus() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectRevert(EscrowVault.JobNotInExpectedState.selector);
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+    }
+
+    function test_RefundFunds_RevertsFromInProgressStatus() public {
+        bytes32 jobId = _postJob();
+        vm.prank(freelancer);
+        registry.acceptJob(jobId);
+
+        vm.expectRevert(EscrowVault.JobNotInExpectedState.selector);
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+    }
+
+    function test_RefundFunds_WorksFromSubmittedStatus() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        uint256 clientBefore = cUSD.balanceOf(client);
+
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+
+        assertEq(cUSD.balanceOf(client), clientBefore + BOUNTY);
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
+    function test_RefundFunds_WorksFromDisputedStatus() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        registry.markDisputed(jobId);
+
+        uint256 clientBefore = cUSD.balanceOf(client);
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+
+        assertEq(cUSD.balanceOf(client), clientBefore + BOUNTY);
+    }
+
+    function test_CannotRefundTwice() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+
+        vm.expectRevert(EscrowVault.NoFundsLocked.selector);
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+    }
+
+    function test_CannotReleaseAfterRefund() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+
+        vm.expectRevert(EscrowVault.NoFundsLocked.selector);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+    }
+
+    function test_CannotRefundAfterRelease() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        vm.expectRevert(EscrowVault.NoFundsLocked.selector);
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+    }
+
+    function test_VaultBalanceCorrectAfterRelease() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        uint256 vaultBefore = cUSD.balanceOf(address(vault));
+
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        assertEq(cUSD.balanceOf(address(vault)), vaultBefore - BOUNTY);
+    }
+
+    function test_VaultBalanceCorrectAfterRefund() public {
+        bytes32 jobId = _postAcceptAndSubmit();
+        uint256 vaultBefore = cUSD.balanceOf(address(vault));
+
+        vm.prank(agent);
+        vault.refundFunds(jobId);
+
+        assertEq(cUSD.balanceOf(address(vault)), vaultBefore - BOUNTY);
+    }
+
+    function test_MultipleJobs_IndependentRelease() public {
+        bytes32 jobId1 = _postAcceptAndSubmitWithTitle("Job One");
+        bytes32 jobId2 = _postAcceptAndSubmitWithTitle("Job Two");
+
+        // Release job1 from SUBMITTED
+        vm.prank(agent);
+        vault.releaseFunds(jobId1);
+
+        // Mark job2 completed then release
+        vm.startPrank(agent);
+        registry.markCompleted(jobId2);
+        vault.releaseFunds(jobId2);
+        vm.stopPrank();
+
+        assertEq(vault.getLockedAmount(jobId1), 0);
+        assertEq(vault.getLockedAmount(jobId2), 0);
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32 jobId) {
@@ -386,6 +505,18 @@ contract EscrowVaultTest is Test {
 
     function _postAcceptAndSubmit() internal returns (bytes32 jobId) {
         jobId = _postJob();
+        vm.prank(freelancer);
+        registry.acceptJob(jobId);
+        vm.prank(freelancer);
+        registry.submitWork(jobId, "ipfs://QmDeliverable");
+    }
+
+    function _postAcceptAndSubmitWithTitle(string memory title) internal returns (bytes32 jobId) {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+        jobId = registry.postJob(title, "ipfs://QmCriteria", BOUNTY, uint40(block.timestamp + DEADLINE));
+        vm.stopPrank();
+        vm.warp(block.timestamp + 1); // ensure unique timestamp → unique jobId
         vm.prank(freelancer);
         registry.acceptJob(jobId);
         vm.prank(freelancer);
