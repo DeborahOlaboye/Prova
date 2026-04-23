@@ -87,6 +87,7 @@ contract EscrowVault {
     }
 
     /// @notice Refund bounty to client. Called by agent on failed evaluation.
+    /// @dev Accepts SUBMITTED, COMPLETED, or DISPUTED status to handle all agent call orderings.
     function refundFunds(bytes32 jobId) external onlyAgent {
         uint256 amount = lockedFunds[jobId];
         if (amount == 0) revert NoFundsLocked();
@@ -94,6 +95,7 @@ contract EscrowVault {
         JobRegistry.Job memory job = jobRegistry.getJob(jobId);
         if (
             job.status != JobRegistry.JobStatus.SUBMITTED &&
+            job.status != JobRegistry.JobStatus.COMPLETED &&
             job.status != JobRegistry.JobStatus.DISPUTED
         ) revert JobNotInExpectedState();
 
