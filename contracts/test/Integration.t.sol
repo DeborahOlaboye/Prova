@@ -162,6 +162,73 @@ contract IntegrationTest is Test {
         assertGt(composite, 0);
     }
 
+    /// @notice Agent calls markCompleted before releaseFunds — must not revert
+    function test_MarkCompletedBeforeRelease_DoesNotRevert() public {
+        bytes32 jobId = _fullSubmit();
+        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
+
+        vm.startPrank(agent);
+        registry.markCompleted(jobId); // status = COMPLETED
+        vault.releaseFunds(jobId);     // must accept COMPLETED
+        vm.stopPrank();
+
+        assertEq(cUSD.balanceOf(freelancer), freelancerBefore + BOUNTY);
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
+    /// @notice Agent calls releaseFunds before markCompleted — standard ordering
+    function test_ReleaseBeforeMarkCompleted_StandardOrdering() public {
+        bytes32 jobId = _fullSubmit();
+        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
+
+        vm.startPrank(agent);
+        vault.releaseFunds(jobId);     // status = SUBMITTED — accepted
+        registry.markCompleted(jobId); // status = COMPLETED
+        vm.stopPrank();
+
+        assertEq(cUSD.balanceOf(freelancer), freelancerBefore + BOUNTY);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.COMPLETED));
+    }
+
+    /// @notice Both orderings produce identical final state
+    function test_BothCallOrderings_IdenticalFinalState() public {
+        // Ordering A: release → markCompleted
+        bytes32 jobA = _fullSubmit();
+        vm.startPrank(agent);
+        vault.releaseFunds(jobA);
+        registry.markCompleted(jobA);
+        vm.stopPrank();
+
+        // Ordering B: markCompleted → release
+        bytes32 jobB = _fullSubmit();
+        vm.startPrank(agent);
+        registry.markCompleted(jobB);
+        vault.releaseFunds(jobB);
+        vm.stopPrank();
+
+        // Both jobs end in COMPLETED with zero locked funds
+        assertEq(uint8(registry.getJob(jobA).status), uint8(JobRegistry.JobStatus.COMPLETED));
+        assertEq(uint8(registry.getJob(jobB).status), uint8(JobRegistry.JobStatus.COMPLETED));
+        assertEq(vault.getLockedAmount(jobA), 0);
+        assertEq(vault.getLockedAmount(jobB), 0);
+    }
+        for (uint256 i = 0; i < 3; i++) {
+            bytes32 jobId = _fullSubmit();
+            vm.startPrank(agent);
+            vault.releaseFunds(jobId);
+            registry.markCompleted(jobId);
+            reputation.recordCompletion(freelancer, jobId, 90, BOUNTY);
+            vm.stopPrank();
+        }
+
+        ReputationLedger.Score memory score = reputation.getScore(freelancer);
+        assertEq(score.jobsCompleted, 3);
+        assertEq(score.totalEarned, BOUNTY * 3);
+
+        uint256 composite = reputation.getCompositeScore(freelancer);
+        assertGt(composite, 0);
+    }
+
     // --- helpers ---
 
     function _fullSubmit() internal returns (bytes32 jobId) {
