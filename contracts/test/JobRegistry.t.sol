@@ -549,6 +549,154 @@ contract JobRegistryTest is Test {
         vm.stopPrank();
     }
 
+    // --- self-accept tests ---
+
+    function test_ClientCannotAcceptOwnJob() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+    }
+
+    function test_ClientCannotAcceptOwnJob_StatusUnchanged() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // Job must still be OPEN after failed accept
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
+    }
+
+    function test_ClientCannotAcceptOwnJob_FreelancerStillZero() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // Freelancer field must remain address(0)
+        assertEq(registry.getJob(jobId).freelancer, address(0));
+    }
+
+    function test_ClientCannotAcceptOwnJob_BountyStillLocked() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // Bounty must still be locked in vault
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+    }
+
+    function test_ClientCannotAcceptOwnJob_NotAddedToFreelancerJobs() public {
+        bytes32 jobId = _postJob();
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // Client must not appear in their own freelancerJobs list
+        assertEq(registry.getFreelancerJobs(client).length, 0);
+    }
+
+    function test_ClientCannotAcceptOwnJob_StillOpenForOthers() public {
+        bytes32 jobId = _postJob();
+
+        // Client attempt fails
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // A different address can still accept
+        vm.prank(freelancer);
+        registry.acceptJob(jobId);
+
+        assertEq(registry.getJob(jobId).freelancer, freelancer);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.IN_PROGRESS));
+    }
+
+    function test_ClientCannotAcceptOwnJob_OpenJobCountUnchanged() public {
+        bytes32 jobId = _postJob();
+        uint256 countBefore = registry.getOpenJobCount();
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // Open job count must not change on failed accept
+        assertEq(registry.getOpenJobCount(), countBefore);
+    }
+
+    function test_DifferentAddressCanAlwaysAccept() public {
+        bytes32 jobId = _postJob();
+        address stranger = makeAddr("stranger");
+
+        vm.prank(stranger);
+        registry.acceptJob(jobId);
+
+        assertEq(registry.getJob(jobId).freelancer, stranger);
+    }
+
+    function test_ClientCannotAcceptOwnJob_MultipleJobs() public {
+        bytes32 jobId1 = _postJob();
+        bytes32 jobId2 = _postJobWithBounty(5e18);
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId1);
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId2);
+
+        // Both still open
+        assertEq(uint8(registry.getJob(jobId1).status), uint8(JobRegistry.JobStatus.OPEN));
+        assertEq(uint8(registry.getJob(jobId2).status), uint8(JobRegistry.JobStatus.OPEN));
+    }
+
+    function test_ClientCannotAcceptOwnJob_AfterCancelAttempt() public {
+        bytes32 jobId = _postJob();
+
+        // Self-accept fails
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // Client can still cancel normally
+        vm.prank(client);
+        registry.cancelJob(jobId);
+
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.CANCELLED));
+    }
+
+    function test_SelfAcceptCheckBeforeDeadlineCheck() public {
+        bytes32 jobId = _postJob();
+
+        // Warp past deadline
+        vm.warp(block.timestamp + 8 days);
+
+        // Should revert with ClientCannotAcceptOwnJob, not DeadlinePassed
+        // because the self-accept check comes first
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+    }
+
+    function testFuzz_NonClientCanAlwaysAccept(address caller) public {
+        vm.assume(caller != client && caller != address(0));
+        bytes32 jobId = _postJob();
+
+        vm.prank(caller);
+        registry.acceptJob(jobId);
+
+        assertEq(registry.getJob(jobId).freelancer, caller);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.IN_PROGRESS));
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32) {
