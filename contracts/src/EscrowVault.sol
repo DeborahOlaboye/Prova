@@ -31,6 +31,10 @@ contract EscrowVault {
     error Unauthorized();
     error AlreadyLocked();
     error NoFundsLocked();
+    /// @notice Thrown when job status is not valid for the requested vault operation.
+    ///         releaseFunds requires SUBMITTED or COMPLETED.
+    ///         refundFunds requires SUBMITTED, COMPLETED, or DISPUTED.
+    ///         refundOnCancel requires CANCELLED.
     error JobNotInExpectedState();
     error ZeroAmount();
 
