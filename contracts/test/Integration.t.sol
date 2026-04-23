@@ -162,6 +162,71 @@ contract IntegrationTest is Test {
         assertGt(composite, 0);
     }
 
+    /// @notice Client cannot self-accept — bounty stays locked, job stays open
+    function test_ClientCannotSelfAccept_Integration() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+        bytes32 jobId = registry.postJob(
+            "Build a DeFi dashboard",
+            "ipfs://QmCriteria",
+            BOUNTY,
+            uint40(block.timestamp + DEADLINE)
+        );
+        vm.stopPrank();
+
+        uint256 vaultBefore = cUSD.balanceOf(address(vault));
+
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // Bounty still locked, job still open
+        assertEq(vault.getLockedAmount(jobId), BOUNTY);
+        assertEq(cUSD.balanceOf(address(vault)), vaultBefore);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
+    }
+
+    /// @notice After failed self-accept, a real freelancer can still accept
+    function test_AfterFailedSelfAccept_FreelancerCanAccept() public {
+        vm.startPrank(client);
+        cUSD.approve(address(registry), BOUNTY);
+        bytes32 jobId = registry.postJob(
+            "Build a DeFi dashboard",
+            "ipfs://QmCriteria",
+            BOUNTY,
+            uint40(block.timestamp + DEADLINE)
+        );
+        vm.stopPrank();
+
+        // Client self-accept fails
+        vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
+        vm.prank(client);
+        registry.acceptJob(jobId);
+
+        // Freelancer accepts successfully
+        vm.prank(freelancer);
+        registry.acceptJob(jobId);
+
+        assertEq(registry.getJob(jobId).freelancer, freelancer);
+        assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.IN_PROGRESS));
+    }
+        for (uint256 i = 0; i < 3; i++) {
+            bytes32 jobId = _fullSubmit();
+            vm.startPrank(agent);
+            vault.releaseFunds(jobId);
+            registry.markCompleted(jobId);
+            reputation.recordCompletion(freelancer, jobId, 90, BOUNTY);
+            vm.stopPrank();
+        }
+
+        ReputationLedger.Score memory score = reputation.getScore(freelancer);
+        assertEq(score.jobsCompleted, 3);
+        assertEq(score.totalEarned, BOUNTY * 3);
+
+        uint256 composite = reputation.getCompositeScore(freelancer);
+        assertGt(composite, 0);
+    }
+
     // --- helpers ---
 
     function _fullSubmit() internal returns (bytes32 jobId) {
