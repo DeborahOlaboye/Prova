@@ -1,5 +1,6 @@
 import { Env, JobEvaluationRequest } from '../lib/types';
 import { withErrorHandling, requireMethod } from '../lib/errors';
+import { CONFIDENCE_AUTO, CONFIDENCE_MANUAL } from '../lib/constants';
 import { evaluateWithClaude } from '../lib/claude';
 import { fetchIPFSContent } from '../lib/ipfs';
 import {
@@ -11,9 +12,6 @@ import {
   encodeRefundFunds,
   encodeEscalateToArbiters,
 } from '../lib/chain';
-
-const CONFIDENCE_AUTO = 0.85;
-const CONFIDENCE_LOW = 0.60;
 
 export class JobAgent {
   private state: DurableObjectState;
@@ -73,7 +71,7 @@ export class JobAgent {
         await sendTransaction({ ...txBase, to: this.env.ESCROW_VAULT_ADDRESS, data: encodeRefundFunds(jobId) });
         await sendTransaction({ ...txBase, to: this.env.JOB_REGISTRY_ADDRESS, data: encodeMarkRefunded(jobId) });
       }
-    } else if (result.confidence >= CONFIDENCE_LOW) {
+    } else if (result.confidence >= CONFIDENCE_MANUAL) {
       // Low confidence — mark disputed, notify parties
       await sendTransaction({ ...txBase, to: this.env.JOB_REGISTRY_ADDRESS, data: encodeMarkDisputed(jobId) });
     } else {
