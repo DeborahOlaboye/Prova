@@ -92,9 +92,11 @@ export class DisputeAgent {
 
     if (result.confidence >= 0.85) {
       if (result.pass) {
+        // releaseFunds accepts SUBMITTED or COMPLETED — safe regardless of call order.
         await sendTransaction({ ...txBase, to: this.env.ESCROW_VAULT_ADDRESS, data: encodeReleaseFunds(jobId) });
         await sendTransaction({ ...txBase, to: this.env.JOB_REGISTRY_ADDRESS, data: encodeMarkCompleted(jobId) });
       } else {
+        // refundFunds accepts SUBMITTED, COMPLETED, or DISPUTED — safe regardless of call order.
         await sendTransaction({ ...txBase, to: this.env.ESCROW_VAULT_ADDRESS, data: encodeRefundFunds(jobId) });
         await sendTransaction({ ...txBase, to: this.env.JOB_REGISTRY_ADDRESS, data: encodeMarkRefunded(jobId) });
       }
