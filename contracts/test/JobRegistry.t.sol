@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 /// @notice Test suite for JobRegistry including empty string validation
 /// @dev Tests cover EmptyTitle and EmptyCriteria error conditions
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {JobRegistry} from "../src/JobRegistry.sol";
 import {EscrowVault} from "../src/EscrowVault.sol";
 import {ArbiterPool} from "../src/ArbiterPool.sol";
