@@ -54,7 +54,6 @@ contract IntegrationTest is Test {
     /// @notice Happy path: post → accept → submit → AI passes → release → reputation updated
     function test_HappyPath_AIRelease() public {
         bytes32 jobId = _fullSubmit();
-
         uint256 freelancerBefore = cUSD.balanceOf(freelancer);
 
         vm.startPrank(agent);
@@ -75,7 +74,6 @@ contract IntegrationTest is Test {
     /// @notice Refund path: AI evaluation fails → client gets bounty back
     function test_RefundPath_AIReject() public {
         bytes32 jobId = _fullSubmit();
-
         uint256 clientBefore = cUSD.balanceOf(client);
 
         vm.startPrank(agent);

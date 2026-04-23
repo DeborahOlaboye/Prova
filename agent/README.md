@@ -18,6 +18,9 @@ Called after a freelancer submits work. Triggers AI evaluation.
 { "jobId": "0x...", "criteriaIPFSHash": "ipfs://...", "deliverableIPFSHash": "ipfs://..." }
 ```
 
+> **Call ordering note:** `releaseFunds` on EscrowVault accepts both `SUBMITTED` and `COMPLETED`
+> job status, so the agent can call `markCompleted` before or after `releaseFunds` without reverting.
+
 ### POST /dispute/submit-argument
 Submit a client or freelancer argument for a disputed job.
 ```json

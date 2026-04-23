@@ -31,6 +31,10 @@ contract EscrowVault {
     error Unauthorized();
     error AlreadyLocked();
     error NoFundsLocked();
+    /// @notice Thrown when job status is not valid for the requested vault operation.
+    ///         releaseFunds requires SUBMITTED or COMPLETED.
+    ///         refundFunds requires SUBMITTED, COMPLETED, or DISPUTED.
+    ///         refundOnCancel requires CANCELLED.
     error JobNotInExpectedState();
     error ZeroAmount();
 
@@ -67,12 +71,18 @@ contract EscrowVault {
     }
 
     /// @notice Release funds to freelancer. Called by agent on successful evaluation.
+    /// @dev Accepts both SUBMITTED and COMPLETED status to handle any agent call ordering.
+    ///      The agent may call markCompleted before or after releaseFunds; both orderings
+    ///      must succeed so funds are never permanently locked.
     function releaseFunds(bytes32 jobId) external onlyAgent {
         uint256 amount = lockedFunds[jobId];
         if (amount == 0) revert NoFundsLocked();
 
         JobRegistry.Job memory job = jobRegistry.getJob(jobId);
-        if (job.status != JobRegistry.JobStatus.SUBMITTED) revert JobNotInExpectedState();
+        if (
+            job.status != JobRegistry.JobStatus.SUBMITTED &&
+            job.status != JobRegistry.JobStatus.COMPLETED
+        ) revert JobNotInExpectedState();
 
         lockedFunds[jobId] = 0;
         cUSD.transfer(job.freelancer, amount);
@@ -81,6 +91,7 @@ contract EscrowVault {
     }
 
     /// @notice Refund bounty to client. Called by agent on failed evaluation.
+    /// @dev Accepts SUBMITTED, COMPLETED, or DISPUTED status to handle all agent call orderings.
     function refundFunds(bytes32 jobId) external onlyAgent {
         uint256 amount = lockedFunds[jobId];
         if (amount == 0) revert NoFundsLocked();
@@ -88,6 +99,7 @@ contract EscrowVault {
         JobRegistry.Job memory job = jobRegistry.getJob(jobId);
         if (
             job.status != JobRegistry.JobStatus.SUBMITTED &&
+            job.status != JobRegistry.JobStatus.COMPLETED &&
             job.status != JobRegistry.JobStatus.DISPUTED
         ) revert JobNotInExpectedState();
 
@@ -117,6 +129,8 @@ contract EscrowVault {
     }
 
     /// @notice Escalate to arbiter pool when AI cannot resolve dispute.
+    /// @dev disputeId is derived from jobId and block.timestamp. See issue #10 for
+    ///      collision risk when two disputes are opened in the same block.
     function escalateToArbiters(bytes32 jobId) external onlyAgent returns (bytes32 disputeId) {
         uint256 amount = lockedFunds[jobId];
         if (amount == 0) revert NoFundsLocked();
@@ -130,6 +144,8 @@ contract EscrowVault {
     }
 
     /// @notice Called by ArbiterPool after voting concludes to execute the decision.
+    /// @dev Transfers funds to freelancer on RELEASED outcome, to client on REFUNDED outcome.
+    ///      Clears lockedFunds before transfer to prevent re-entrancy.
     function executeArbiterDecision(bytes32 disputeId) external {
         if (msg.sender != address(arbiterPool)) revert Unauthorized();
 
