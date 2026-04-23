@@ -8,8 +8,8 @@ import {ArbiterPool} from "../src/ArbiterPool.sol";
 import {ReputationLedger} from "../src/ReputationLedger.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
-/// @notice End-to-end tests covering happy path, refund, dispute → arbiter resolution,
-///         and reputation tracking across a full job lifecycle.
+/// @notice End-to-end tests covering happy path, refund, dispute, reputation,
+///         and releaseFunds call-ordering safety.
 contract IntegrationTest is Test {
     JobRegistry      registry;
     EscrowVault      vault;
@@ -25,7 +25,7 @@ contract IntegrationTest is Test {
     address arb2       = makeAddr("arb2");
     address arb3       = makeAddr("arb3");
 
-    uint256 constant BOUNTY  = 20e18;
+    uint256 constant BOUNTY   = 20e18;
     uint40  constant DEADLINE = 14 days;
 
     function setUp() public {
@@ -48,17 +48,14 @@ contract IntegrationTest is Test {
         cUSD.mint(arb1, 50e18);
         cUSD.mint(arb2, 50e18);
         cUSD.mint(arb3, 50e18);
-        // Fund arbiter pool for fee distribution
         cUSD.mint(address(arbiterPool), 100e18);
     }
 
     /// @notice Happy path: post → accept → submit → AI passes → release → reputation updated
     function test_HappyPath_AIRelease() public {
         bytes32 jobId = _fullSubmit();
-
         uint256 freelancerBefore = cUSD.balanceOf(freelancer);
 
-        // Agent evaluates: PASS — release funds first (checks SUBMITTED), then mark completed
         vm.startPrank(agent);
         vault.releaseFunds(jobId);
         registry.markCompleted(jobId);
@@ -77,10 +74,8 @@ contract IntegrationTest is Test {
     /// @notice Refund path: AI evaluation fails → client gets bounty back
     function test_RefundPath_AIReject() public {
         bytes32 jobId = _fullSubmit();
-
         uint256 clientBefore = cUSD.balanceOf(client);
 
-        // Refund funds first (checks SUBMITTED), then mark refunded
         vm.startPrank(agent);
         vault.refundFunds(jobId);
         registry.markRefunded(jobId);
@@ -95,24 +90,19 @@ contract IntegrationTest is Test {
         _stakeArbiters();
         bytes32 jobId = _fullSubmit();
 
-        // Agent marks as disputed (low confidence)
         vm.prank(agent);
         registry.markDisputed(jobId);
 
-        // Agent escalates to arbiter pool
         vm.prank(agent);
         bytes32 disputeId = vault.escalateToArbiters(jobId);
 
-        // Arbiters vote
         address[] memory selected = _getSelectedArbiters(disputeId);
-        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
 
         vm.prank(selected[0]);
         arbiterPool.submitVote(disputeId, ArbiterPool.Vote.RELEASE);
         vm.prank(selected[1]);
         arbiterPool.submitVote(disputeId, ArbiterPool.Vote.RELEASE);
 
-        // Dispute resolved as RELEASED
         assertEq(
             uint8(arbiterPool.getDisputeOutcome(disputeId)),
             uint8(ArbiterPool.DisputeOutcome.RELEASED)
@@ -192,41 +182,22 @@ contract IntegrationTest is Test {
 
     /// @notice Both orderings produce identical final state
     function test_BothCallOrderings_IdenticalFinalState() public {
-        // Ordering A: release → markCompleted
         bytes32 jobA = _fullSubmit();
         vm.startPrank(agent);
         vault.releaseFunds(jobA);
         registry.markCompleted(jobA);
         vm.stopPrank();
 
-        // Ordering B: markCompleted → release
         bytes32 jobB = _fullSubmit();
         vm.startPrank(agent);
         registry.markCompleted(jobB);
         vault.releaseFunds(jobB);
         vm.stopPrank();
 
-        // Both jobs end in COMPLETED with zero locked funds
         assertEq(uint8(registry.getJob(jobA).status), uint8(JobRegistry.JobStatus.COMPLETED));
         assertEq(uint8(registry.getJob(jobB).status), uint8(JobRegistry.JobStatus.COMPLETED));
         assertEq(vault.getLockedAmount(jobA), 0);
         assertEq(vault.getLockedAmount(jobB), 0);
-    }
-        for (uint256 i = 0; i < 3; i++) {
-            bytes32 jobId = _fullSubmit();
-            vm.startPrank(agent);
-            vault.releaseFunds(jobId);
-            registry.markCompleted(jobId);
-            reputation.recordCompletion(freelancer, jobId, 90, BOUNTY);
-            vm.stopPrank();
-        }
-
-        ReputationLedger.Score memory score = reputation.getScore(freelancer);
-        assertEq(score.jobsCompleted, 3);
-        assertEq(score.totalEarned, BOUNTY * 3);
-
-        uint256 composite = reputation.getCompositeScore(freelancer);
-        assertGt(composite, 0);
     }
 
     // --- helpers ---
@@ -260,12 +231,11 @@ contract IntegrationTest is Test {
     }
 
     function _getSelectedArbiters(bytes32 disputeId) internal view returns (address[] memory) {
-        // Re-derive selected arbiters from pool — use known stakers
+        disputeId;
         address[3] memory arbs = [arb1, arb2, arb3];
         address[] memory selected = new address[](3);
-        uint256 count;
         for (uint256 i = 0; i < 3; i++) {
-            selected[count++] = arbs[i];
+            selected[i] = arbs[i];
         }
         return selected;
     }
