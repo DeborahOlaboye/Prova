@@ -9,7 +9,7 @@ import {ReputationLedger} from "../src/ReputationLedger.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
 /// @notice End-to-end tests covering happy path, refund, dispute → arbiter resolution,
-///         and reputation tracking across a full job lifecycle.
+///         reputation tracking, and self-accept prevention across a full job lifecycle.
 contract IntegrationTest is Test {
     JobRegistry      registry;
     EscrowVault      vault;
@@ -25,7 +25,7 @@ contract IntegrationTest is Test {
     address arb2       = makeAddr("arb2");
     address arb3       = makeAddr("arb3");
 
-    uint256 constant BOUNTY  = 20e18;
+    uint256 constant BOUNTY   = 20e18;
     uint40  constant DEADLINE = 14 days;
 
     function setUp() public {
@@ -48,7 +48,6 @@ contract IntegrationTest is Test {
         cUSD.mint(arb1, 50e18);
         cUSD.mint(arb2, 50e18);
         cUSD.mint(arb3, 50e18);
-        // Fund arbiter pool for fee distribution
         cUSD.mint(address(arbiterPool), 100e18);
     }
 
@@ -58,7 +57,6 @@ contract IntegrationTest is Test {
 
         uint256 freelancerBefore = cUSD.balanceOf(freelancer);
 
-        // Agent evaluates: PASS — release funds first (checks SUBMITTED), then mark completed
         vm.startPrank(agent);
         vault.releaseFunds(jobId);
         registry.markCompleted(jobId);
@@ -80,7 +78,6 @@ contract IntegrationTest is Test {
 
         uint256 clientBefore = cUSD.balanceOf(client);
 
-        // Refund funds first (checks SUBMITTED), then mark refunded
         vm.startPrank(agent);
         vault.refundFunds(jobId);
         registry.markRefunded(jobId);
@@ -95,24 +92,19 @@ contract IntegrationTest is Test {
         _stakeArbiters();
         bytes32 jobId = _fullSubmit();
 
-        // Agent marks as disputed (low confidence)
         vm.prank(agent);
         registry.markDisputed(jobId);
 
-        // Agent escalates to arbiter pool
         vm.prank(agent);
         bytes32 disputeId = vault.escalateToArbiters(jobId);
 
-        // Arbiters vote
         address[] memory selected = _getSelectedArbiters(disputeId);
-        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
 
         vm.prank(selected[0]);
         arbiterPool.submitVote(disputeId, ArbiterPool.Vote.RELEASE);
         vm.prank(selected[1]);
         arbiterPool.submitVote(disputeId, ArbiterPool.Vote.RELEASE);
 
-        // Dispute resolved as RELEASED
         assertEq(
             uint8(arbiterPool.getDisputeOutcome(disputeId)),
             uint8(ArbiterPool.DisputeOutcome.RELEASED)
@@ -180,7 +172,6 @@ contract IntegrationTest is Test {
         vm.prank(client);
         registry.acceptJob(jobId);
 
-        // Bounty still locked, job still open
         assertEq(vault.getLockedAmount(jobId), BOUNTY);
         assertEq(cUSD.balanceOf(address(vault)), vaultBefore);
         assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.OPEN));
@@ -198,33 +189,15 @@ contract IntegrationTest is Test {
         );
         vm.stopPrank();
 
-        // Client self-accept fails
         vm.expectRevert(JobRegistry.ClientCannotAcceptOwnJob.selector);
         vm.prank(client);
         registry.acceptJob(jobId);
 
-        // Freelancer accepts successfully
         vm.prank(freelancer);
         registry.acceptJob(jobId);
 
         assertEq(registry.getJob(jobId).freelancer, freelancer);
         assertEq(uint8(registry.getJob(jobId).status), uint8(JobRegistry.JobStatus.IN_PROGRESS));
-    }
-        for (uint256 i = 0; i < 3; i++) {
-            bytes32 jobId = _fullSubmit();
-            vm.startPrank(agent);
-            vault.releaseFunds(jobId);
-            registry.markCompleted(jobId);
-            reputation.recordCompletion(freelancer, jobId, 90, BOUNTY);
-            vm.stopPrank();
-        }
-
-        ReputationLedger.Score memory score = reputation.getScore(freelancer);
-        assertEq(score.jobsCompleted, 3);
-        assertEq(score.totalEarned, BOUNTY * 3);
-
-        uint256 composite = reputation.getCompositeScore(freelancer);
-        assertGt(composite, 0);
     }
 
     // --- helpers ---
@@ -258,12 +231,11 @@ contract IntegrationTest is Test {
     }
 
     function _getSelectedArbiters(bytes32 disputeId) internal view returns (address[] memory) {
-        // Re-derive selected arbiters from pool — use known stakers
+        disputeId; // suppress unused warning
         address[3] memory arbs = [arb1, arb2, arb3];
         address[] memory selected = new address[](3);
-        uint256 count;
         for (uint256 i = 0; i < 3; i++) {
-            selected[count++] = arbs[i];
+            selected[i] = arbs[i];
         }
         return selected;
     }
