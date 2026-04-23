@@ -38,8 +38,17 @@ export default {
       const stub = env.REPUTATION_AGENT.get(id);
       response = await stub.fetch(request);
     }
-    else if (url.pathname === '/health') {
+    if (url.pathname === '/health') {
       response = Response.json({ status: 'ok', ts: Date.now() });
+    }
+    // Webhook: called by frontend after freelancer submits work
+    else if (url.pathname === '/webhook/work-submitted' && request.method === 'POST') {
+      const id = env.JOB_AGENT.idFromName('singleton');
+      const stub = env.JOB_AGENT.get(id);
+      response = await stub.fetch(new Request(
+        request.url.replace('/webhook/work-submitted', '/evaluate'),
+        request
+      ));
     }
     else {
       response = new Response('Not found', { status: 404 });
