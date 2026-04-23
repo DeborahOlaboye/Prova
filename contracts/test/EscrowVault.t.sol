@@ -489,6 +489,32 @@ contract EscrowVaultTest is Test {
         assertEq(vault.getLockedAmount(jobId2), 0);
     }
 
+    function testFuzz_ReleaseFunds_FreelancerReceivesExactAmount(uint256 bounty) public {
+        bounty = bound(bounty, registry.MIN_BOUNTY(), 50e18);
+
+        vm.startPrank(client);
+        cUSD.approve(address(registry), bounty);
+        bytes32 jobId = registry.postJob(
+            "Fuzz job",
+            "ipfs://QmCriteria",
+            bounty,
+            uint40(block.timestamp + 7 days)
+        );
+        vm.stopPrank();
+
+        vm.prank(freelancer);
+        registry.acceptJob(jobId);
+        vm.prank(freelancer);
+        registry.submitWork(jobId, "ipfs://QmDeliverable");
+
+        uint256 freelancerBefore = cUSD.balanceOf(freelancer);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        assertEq(cUSD.balanceOf(freelancer), freelancerBefore + bounty);
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
     // --- helpers ---
 
     function _postJob() internal returns (bytes32 jobId) {
