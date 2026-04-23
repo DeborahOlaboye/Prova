@@ -67,12 +67,18 @@ contract EscrowVault {
     }
 
     /// @notice Release funds to freelancer. Called by agent on successful evaluation.
+    /// @dev Accepts both SUBMITTED and COMPLETED status to handle any agent call ordering.
+    ///      The agent may call markCompleted before or after releaseFunds; both orderings
+    ///      must succeed so funds are never permanently locked.
     function releaseFunds(bytes32 jobId) external onlyAgent {
         uint256 amount = lockedFunds[jobId];
         if (amount == 0) revert NoFundsLocked();
 
         JobRegistry.Job memory job = jobRegistry.getJob(jobId);
-        if (job.status != JobRegistry.JobStatus.SUBMITTED) revert JobNotInExpectedState();
+        if (
+            job.status != JobRegistry.JobStatus.SUBMITTED &&
+            job.status != JobRegistry.JobStatus.COMPLETED
+        ) revert JobNotInExpectedState();
 
         lockedFunds[jobId] = 0;
         cUSD.transfer(job.freelancer, amount);
