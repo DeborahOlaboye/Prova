@@ -565,6 +565,42 @@ contract EscrowVaultTest is Test {
         vault.refundFunds(jobId);
     }
 
+    function test_SetAuthorizedAgent_OnlyOwner() public {
+        address newAgent = makeAddr("newAgent");
+
+        vm.expectRevert(EscrowVault.Unauthorized.selector);
+        vm.prank(client);
+        vault.setAuthorizedAgent(newAgent);
+    }
+
+    function test_SetAuthorizedAgent_UpdatesAgent() public {
+        address newAgent = makeAddr("newAgent");
+
+        vm.prank(owner);
+        vault.setAuthorizedAgent(newAgent);
+
+        // Old agent can no longer release
+        bytes32 jobId = _postAcceptAndSubmit();
+        vm.expectRevert(EscrowVault.Unauthorized.selector);
+        vm.prank(agent);
+        vault.releaseFunds(jobId);
+
+        // New agent can release
+        vm.prank(newAgent);
+        vault.releaseFunds(jobId);
+        assertEq(vault.getLockedAmount(jobId), 0);
+    }
+
+    function test_SetAuthorizedAgent_EmitsEvent() public {
+        address newAgent = makeAddr("newAgent");
+
+        vm.expectEmit(true, false, false, false);
+        emit EscrowVault.AgentUpdated(newAgent);
+
+        vm.prank(owner);
+        vault.setAuthorizedAgent(newAgent);
+    }
+
     function test_FundsLockedEvent_EmittedOnPost() public {
         vm.startPrank(client);
         cUSD.approve(address(registry), BOUNTY);
