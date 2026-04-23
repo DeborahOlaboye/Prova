@@ -380,6 +380,18 @@ contract EscrowVaultTest is Test {
         vault.releaseFunds(jobId);
     }
 
+    function test_ReleaseFunds_LockedAmountIsZeroBeforeAnyJob() public {
+        bytes32 nonExistentJobId = keccak256("nonexistent");
+        assertEq(vault.getLockedAmount(nonExistentJobId), 0);
+    }
+
+    function test_ReleaseFunds_RevertsForNonExistentJob() public {
+        bytes32 nonExistentJobId = keccak256("nonexistent");
+        vm.expectRevert(EscrowVault.NoFundsLocked.selector);
+        vm.prank(agent);
+        vault.releaseFunds(nonExistentJobId);
+    }
+
     function test_RefundFunds_RevertsFromOpenStatus() public {
         bytes32 jobId = _postJob();
 
