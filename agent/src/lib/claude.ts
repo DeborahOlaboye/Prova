@@ -1,4 +1,5 @@
 import { EvaluationResult } from './types';
+import { HAIKU_CRITERIA_WORD_LIMIT } from './constants';
 
 export async function evaluateWithClaude(
   criteria: string,
@@ -7,7 +8,10 @@ export async function evaluateWithClaude(
   gatewayUrl: string,
   isDispute = false
 ): Promise<EvaluationResult> {
-  const model = isDispute || criteria.length > 500 ? 'claude-sonnet-3-5-20241022' : 'claude-3-5-haiku-20241022';
+  const wordCount = criteria.split(/\s+/).length;
+  const model = isDispute || wordCount > HAIKU_CRITERIA_WORD_LIMIT
+    ? 'claude-sonnet-3-5-20241022'
+    : 'claude-3-5-haiku-20241022';
 
   const prompt = `You are an AI arbitrator for a freelance work platform. Evaluate whether the submitted deliverable meets the acceptance criteria.
 
