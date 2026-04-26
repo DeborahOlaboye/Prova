@@ -27,6 +27,19 @@ import {
 } from './crypto-validation';
 
 /**
+ * Re-export validation functions for convenience
+ */
+export {
+  validateHexString,
+  validateHexLength,
+  validatePrivateKey as validatePrivateKeyInput,
+  validateTransactionHash,
+  validatePublicKeyPoint,
+  validateSignatureComponents,
+  validateTransactionObject,
+} from './crypto-validation';
+
+/**
  * Convert a hexadecimal string to a Uint8Array.
  * @throws InvalidHexError if the hex string is invalid
  */
