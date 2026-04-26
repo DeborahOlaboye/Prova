@@ -95,50 +95,64 @@ function modInverse(a: bigint, mod: bigint): bigint {
 
 /**
  * Point addition on secp256k1
+ * @throws EllipticCurveError if operation fails
  */
 function pointAdd(
   x1: bigint, y1: bigint,
   x2: bigint, y2: bigint
 ): [bigint, bigint] | null {
-  if (x1 === 0n && y1 === 0n) return [x2, y2];
-  if (x2 === 0n && y2 === 0n) return [x1, y1];
-  if (x1 === x2 && y1 === y2) {
-    // Point doubling
-    if (y1 === 0n) return null;
-    const slopeDouble = (3n * x1 * x1 * modInverse(2n * y1, SECP256K1_P)) % SECP256K1_P;
-    const x3 = (slopeDouble * slopeDouble - 2n * x1) % SECP256K1_P;
-    const y3 = (slopeDouble * (x1 - x3) - y1) % SECP256K1_P;
-    return [x3, y3];
-  }
-  if (x1 === x2) return null; // Point at infinity
+  try {
+    if (x1 === 0n && y1 === 0n) return [x2, y2];
+    if (x2 === 0n && y2 === 0n) return [x1, y1];
+    if (x1 === x2 && y1 === y2) {
+      // Point doubling
+      if (y1 === 0n) return null;
+      const slopeDouble = (3n * x1 * x1 * modInverse(2n * y1, SECP256K1_P)) % SECP256K1_P;
+      const x3 = (slopeDouble * slopeDouble - 2n * x1) % SECP256K1_P;
+      const y3 = (slopeDouble * (x1 - x3) - y1) % SECP256K1_P;
+      return [x3, y3];
+    }
+    if (x1 === x2) return null; // Point at infinity
 
-  let slopeAdd = ((y2 - y1) % SECP256K1_P + SECP256K1_P) % SECP256K1_P;
-  slopeAdd = (slopeAdd * modInverse((x2 - x1 + SECP256K1_P) % SECP256K1_P, SECP256K1_P)) % SECP256K1_P;
-  const x3 = (slopeAdd * slopeAdd - x1 - x2) % SECP256K1_P;
-  const y3 = (slopeAdd * (x1 - x3) - y1) % SECP256K1_P;
-  return [x3, y3];
+    let slopeAdd = ((y2 - y1) % SECP256K1_P + SECP256K1_P) % SECP256K1_P;
+    slopeAdd = (slopeAdd * modInverse((x2 - x1 + SECP256K1_P) % SECP256K1_P, SECP256K1_P)) % SECP256K1_P;
+    const x3 = (slopeAdd * slopeAdd - x1 - x2) % SECP256K1_P;
+    const y3 = (slopeAdd * (x1 - x3) - y1) % SECP256K1_P;
+    return [x3, y3];
+  } catch (error) {
+    throw new EllipticCurveError(
+      `Point addition failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
 }
 
 /**
  * Scalar multiplication on secp256k1 using double-and-add algorithm
+ * @throws EllipticCurveError if operation fails
  */
 function pointMultiply(k: bigint, gx: bigint, gy: bigint): [bigint, bigint] | null {
-  let rx = 0n, ry = 0n; // Result point (point at infinity)
-  let tx = gx, ty = gy; // Temporary point (generator)
+  try {
+    let rx = 0n, ry = 0n; // Result point (point at infinity)
+    let tx = gx, ty = gy; // Temporary point (generator)
 
-  while (k > 0n) {
-    if (k & 1n) {
-      const result = pointAdd(rx, ry, tx, ty);
-      if (!result) return null;
-      [rx, ry] = result;
+    while (k > 0n) {
+      if (k & 1n) {
+        const result = pointAdd(rx, ry, tx, ty);
+        if (!result) return null;
+        [rx, ry] = result;
+      }
+      const doubled = pointAdd(tx, ty, tx, ty);
+      if (!doubled) return null;
+      [tx, ty] = doubled;
+      k >>= 1n;
     }
-    const doubled = pointAdd(tx, ty, tx, ty);
-    if (!doubled) return null;
-    [tx, ty] = doubled;
-    k >>= 1n;
-  }
 
-  return [rx, ry];
+    return [rx, ry];
+  } catch (error) {
+    throw new EllipticCurveError(
+      `Scalar multiplication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
 }
 
 /**
