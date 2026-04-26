@@ -23,6 +23,7 @@ import {
   validateTransactionHash,
   validatePublicKeyPoint,
   validateSignatureComponents,
+  validateTransactionObject,
 } from './crypto-validation';
 
 /**
