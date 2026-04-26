@@ -128,6 +128,29 @@ export const JOB_REGISTRY_ABI = [
       { name: "deliverableIPFSHash", type: "string", indexed: false },
     ],
   },
+  {
+    type: "event",
+    name: "JobCompleted",
+    inputs: [{ name: "jobId", type: "bytes32", indexed: true }],
+  },
+  {
+    type: "event",
+    name: "JobDisputed",
+    inputs: [
+      { name: "jobId", type: "bytes32", indexed: true },
+      { name: "raisedBy", type: "address", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "JobRefunded",
+    inputs: [{ name: "jobId", type: "bytes32", indexed: true }],
+  },
+  {
+    type: "event",
+    name: "JobCancelled",
+    inputs: [{ name: "jobId", type: "bytes32", indexed: true }],
+  },
 ] as const;
 
 // ─── EscrowVault ─────────────────────────────────────────────────────────────
@@ -139,6 +162,40 @@ export const ESCROW_VAULT_ABI = [
     stateMutability: "view",
     inputs: [{ name: "jobId", type: "bytes32" }],
     outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "event",
+    name: "FundsLocked",
+    inputs: [
+      { name: "jobId", type: "bytes32", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "FundsReleased",
+    inputs: [
+      { name: "jobId", type: "bytes32", indexed: true },
+      { name: "recipient", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "FundsRefunded",
+    inputs: [
+      { name: "jobId", type: "bytes32", indexed: true },
+      { name: "client", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "DisputeEscalated",
+    inputs: [
+      { name: "jobId", type: "bytes32", indexed: true },
+      { name: "disputeId", type: "bytes32", indexed: true },
+    ],
   },
 ] as const;
 
@@ -246,6 +303,60 @@ export const ARBITER_POOL_ABI = [
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "ARBITER_FEE",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getDisputeOutcome",
+    stateMutability: "view",
+    inputs: [{ name: "disputeId", type: "bytes32" }],
+    outputs: [{ name: "", type: "uint8" }],
+  },
+  {
+    type: "function",
+    name: "isDisputed",
+    stateMutability: "view",
+    inputs: [{ name: "disputeId", type: "bytes32" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "event",
+    name: "DisputeOpened",
+    inputs: [
+      { name: "disputeId", type: "bytes32", indexed: true },
+      { name: "jobId", type: "bytes32", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "VoteCast",
+    inputs: [
+      { name: "disputeId", type: "bytes32", indexed: true },
+      { name: "arbiter", type: "address", indexed: true },
+      { name: "vote", type: "uint8", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "DisputeResolved",
+    inputs: [
+      { name: "disputeId", type: "bytes32", indexed: true },
+      { name: "outcome", type: "uint8", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "FeeClaimed",
+    inputs: [
+      { name: "arbiter", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
   },
 ] as const;
 

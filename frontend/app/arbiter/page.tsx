@@ -48,6 +48,12 @@ export default function ArbiterPage() {
     functionName: "STAKE_AMOUNT",
   });
 
+  const { data: arbiterFeeAmount } = useReadContract({
+    address: CONTRACT_ADDRESSES.arbiterPool,
+    abi: ARBITER_POOL_ABI,
+    functionName: "ARBITER_FEE",
+  });
+
   // cUSD allowance for staking
   const { data: allowance } = useReadContract({
     address: CONTRACT_ADDRESSES.cUSD,
@@ -61,7 +67,8 @@ export default function ArbiterPage() {
   const unstakeRequestedAt = (arbiterData as { unstakeRequestedAt?: bigint } | undefined)
     ?.unstakeRequestedAt ?? 0n;
   const fees = (pendingFees ?? 0n) as bigint;
-  const stake = (stakeAmount ?? 10n * 10n ** 18n) as bigint;
+  const stake = (stakeAmount ?? 0n) as bigint;
+  const arbiterFee = (arbiterFeeAmount ?? 0n) as bigint;
   const needsApproval = (allowance ?? 0n) < stake;
 
   // Approve stake
@@ -166,8 +173,8 @@ export default function ArbiterPage() {
       <div className="mb-2">
         <h1 className="text-3xl font-bold">Arbiter Panel</h1>
         <p className="text-white/40 mt-2 text-sm">
-          Stake 10 cUSD to become an arbiter. Earn 2 cUSD for every dispute you vote
-          on that reaches a majority decision.
+          Stake {formatCUSD(stake)} cUSD to become an arbiter. Earn {formatCUSD(arbiterFee)} cUSD
+          for every dispute you vote on that reaches a majority decision.
         </p>
       </div>
 
@@ -250,8 +257,8 @@ export default function ArbiterPage() {
         ) : (
           <div className="space-y-4">
             <p className="text-white/40 text-sm">
-              You are not currently staked. Stake {formatCUSD(stake)} cUSD to join the arbiter
-              pool and start earning dispute fees.
+              You are not currently staked. Stake {formatCUSD(stake)} cUSD to join
+              the arbiter pool and earn {formatCUSD(arbiterFee)} cUSD per resolved dispute.
             </p>
 
             {stakeSuccess ? (
@@ -354,7 +361,7 @@ export default function ArbiterPage() {
         <ul className="list-disc list-inside space-y-1">
           <li>3 arbiters are randomly selected per dispute</li>
           <li>First party to 2/3 votes wins</li>
-          <li>Arbiters who vote earn 2 cUSD per resolved dispute</li>
+          <li>Arbiters who vote earn {formatCUSD(arbiterFee)} cUSD per resolved dispute</li>
           <li>7-day cooldown before unstaking — you must complete any active disputes first</li>
         </ul>
       </div>

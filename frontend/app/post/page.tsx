@@ -79,8 +79,8 @@ export default function PostJobPage() {
     if (!title.trim()) return setError("Title is required");
     if (!criteria.trim()) return setError("Acceptance criteria are required");
     if (bounty < parseUnits("1", 18)) return setError("Minimum bounty is 1 cUSD");
-    if (deadlineTs <= BigInt(Math.floor(Date.now() / 1000)))
-      return setError("Deadline must be in the future");
+    if (deadlineTs <= BigInt(Math.floor((Date.now() + 3_600_000) / 1000)))
+      return setError("Deadline must be at least 1 hour from now");
 
     postWrite(
       {
@@ -166,13 +166,14 @@ export default function PostJobPage() {
         <div>
           <label className="label">Deadline</label>
           <input
-            className="input"
+            className="input w-full"
             type="date"
             value={deadlineStr}
-            min={new Date().toISOString().split("T")[0]}
+            min={new Date(Date.now() + 86_400_000).toISOString().split("T")[0]}
             onChange={(e) => setDeadlineStr(e.target.value)}
             disabled={isPosting || postSuccess}
           />
+          <p className="text-xs text-white/30 mt-1">Earliest: tomorrow</p>
         </div>
 
         {error && (

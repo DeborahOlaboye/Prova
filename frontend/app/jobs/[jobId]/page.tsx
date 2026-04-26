@@ -309,6 +309,27 @@ export default function JobDetailPage() {
           </p>
         </div>
       )}
+
+      {/* Refunded */}
+      {job.status === JobStatus.REFUNDED && (
+        <div className="card border-gray-500/20 bg-gray-500/5">
+          <p className="text-gray-400 font-medium">Bounty Refunded</p>
+          <p className="text-white/40 text-sm mt-1">
+            Work did not meet the acceptance criteria. The bounty has been
+            returned to the client.
+          </p>
+        </div>
+      )}
+
+      {/* Cancelled */}
+      {job.status === JobStatus.CANCELLED && (
+        <div className="card border-gray-500/20 bg-gray-500/5">
+          <p className="text-gray-400 font-medium">Job Cancelled</p>
+          <p className="text-white/40 text-sm mt-1">
+            This job was cancelled by the client. The bounty has been refunded.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

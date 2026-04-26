@@ -36,6 +36,26 @@ body {
 
   .input {
     @apply w-full bg-black/30 border border-[var(--border)] rounded-lg px-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:border-celo-green/60 transition-colors;
+    color-scheme: dark;
+  }
+
+  .input[type="date"],
+  .input[type="datetime-local"] {
+    @apply cursor-pointer;
+    color-scheme: dark;
+  }
+
+  .input[type="date"]::-webkit-calendar-picker-indicator,
+  .input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+  }
+
+  .input[type="date"]::-webkit-calendar-picker-indicator:hover,
+  .input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+    filter: invert(1) brightness(1);
   }
 
   .label {
