@@ -420,26 +420,8 @@ export function encodeTransaction(tx: {
   data: string;
   chainId: string;
 }): Uint8Array {
-  // Validate all transaction fields
-  const fields = [
-    { value: tx.nonce, name: 'nonce' },
-    { value: tx.gasPrice, name: 'gasPrice' },
-    { value: tx.gas, name: 'gas' },
-    { value: tx.to, name: 'to' },
-    { value: tx.value, name: 'value' },
-    { value: tx.data || '0x', name: 'data' },
-    { value: tx.chainId, name: 'chainId' },
-  ];
-
-  for (const field of fields) {
-    try {
-      validateHexString(field.value, field.name);
-    } catch (error) {
-      throw new InvalidHexError(
-        `Transaction field "${field.name}" is invalid: ${error instanceof Error ? error.message : 'unknown error'}`
-      );
-    }
-  }
+  // Validate entire transaction object
+  validateTransactionObject(tx);
 
   const encodedFields = [
     hexToBytes(tx.nonce),
