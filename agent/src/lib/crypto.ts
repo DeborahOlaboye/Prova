@@ -43,10 +43,20 @@ export function hexToBytes(hex: string): Uint8Array {
 
 /**
  * Convert a Uint8Array to a hexadecimal string.
+ * @throws Error if input is invalid
  */
 export function bytesToHex(bytes: Uint8Array): string {
+  if (!bytes || bytes.length === 0) {
+    throw new Error('Cannot convert empty byte array to hex');
+  }
+  
   return '0x' + Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
+    .map(b => {
+      if (b < 0 || b > 255) {
+        throw new Error(`Invalid byte value: ${b}. Expected value between 0 and 255`);
+      }
+      return b.toString(16).padStart(2, '0');
+    })
     .join('');
 }
 
