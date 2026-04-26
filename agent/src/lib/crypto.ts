@@ -289,55 +289,79 @@ function rotl64(n: bigint, offset: number): bigint {
 
 /**
  * Sign a transaction hash using secp256k1.
+ * 
+ * @param txHash - 32-byte transaction hash as hex string
+ * @param privateKey - 32-byte secp256k1 private key as hex string
+ * @returns Signature components (r, s, v)
+ * @throws InvalidPrivateKeyError if private key is invalid
+ * @throws InvalidHexError if transaction hash is invalid
+ * @throws SignatureError if signature generation fails
  */
 export function signHash(txHash: string, privateKey: string): {
   r: string;
   s: string;
   v: number;
 } {
-  const hashBytes = hexToBytes(txHash);
-  const keyBytes = hexToBytes(privateKey);
-  
-  if (hashBytes.length !== 32) {
-    throw new Error('Transaction hash must be 32 bytes');
-  }
-  
-  if (keyBytes.length !== 32) {
-    throw new Error('Private key must be 32 bytes');
-  }
+  try {
+    // Validate inputs
+    validateTransactionHash(txHash);
+    validatePrivateKeyInput(privateKey);
 
-  const k = generateDeterministicK(hashBytes, keyBytes);
-  
-  const point = pointMultiply(k, SECP256K1_GX, SECP256K1_GY);
-  if (!point) {
-    throw new Error('Invalid k value');
-  }
-  
-  const r = point[0];
-  if (r === 0n) {
-    throw new Error('Invalid signature: r is zero');
-  }
+    const hashBytes = hexToBytes(txHash);
+    const privateKeyBigInt = BigInt(privateKey.startsWith('0x') ? privateKey : '0x' + privateKey);
 
-  const z = BigInt('0x' + txHash.replace('0x', ''));
-  const kInv = modInverse(k, SECP256K1_N);
-  const privateKeyBigInt = BigInt('0x' + privateKey.replace('0x', ''));
-  let s = (kInv * (z + r * privateKeyBigInt)) % SECP256K1_N;
-  
-  if (s === 0n) {
-    throw new Error('Invalid signature: s is zero');
+    const k = generateDeterministicK(hashBytes, hexToBytes(privateKey));
+    
+    try {
+      const point = pointMultiply(k, SECP256K1_GX, SECP256K1_GY);
+      if (!point) {
+        throw new SignatureError('Invalid k value: resulted in point at infinity');
+      }
+      
+      const r = point[0];
+      if (r === 0n) {
+        throw new SignatureError('Invalid signature: r component is zero');
+      }
+
+      const z = BigInt(txHash.startsWith('0x') ? txHash : '0x' + txHash);
+      const kInv = modInverse(k, SECP256K1_N);
+      let s = (kInv * (z + r * privateKeyBigInt)) % SECP256K1_N;
+      
+      if (s === 0n) {
+        throw new SignatureError('Invalid signature: s component is zero');
+      }
+
+      // Ensure low s value for signature malleability protection
+      if (s > SECP256K1_N / 2n) {
+        s = SECP256K1_N - s;
+      }
+
+      const v = (point[1] % 2n) === 0n ? 27 : 28;
+      
+      // Validate signature components
+      validateSignatureComponents(r, s, v);
+
+      return {
+        r: '0x' + r.toString(16).padStart(64, '0'),
+        s: '0x' + s.toString(16).padStart(64, '0'),
+        v: v
+      };
+    } catch (error) {
+      if (error instanceof SignatureError) {
+        throw error;
+      }
+      throw new SignatureError(
+        `Failed to generate signature: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  } catch (error) {
+    if (error instanceof InvalidPrivateKeyError || error instanceof InvalidHexError || error instanceof SignatureError) {
+      throw error;
+    }
+    throw new SignatureError(
+      `Signature operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
-
-  if (s > SECP256K1_N / 2n) {
-    s = SECP256K1_N - s;
-  }
-
-  const v = (point[1] % 2n) === 0n ? 27 : 28;
-
-  return {
-    r: '0x' + r.toString(16).padStart(64, '0'),
-    s: '0x' + s.toString(16).padStart(64, '0'),
-    v: v
-  };
 }
 
 function generateDeterministicK(messageHash: Uint8Array, privateKey: Uint8Array): bigint {
