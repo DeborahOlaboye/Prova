@@ -51,7 +51,17 @@ export {
 
 /**
  * Convert a hexadecimal string to a Uint8Array.
- * @throws InvalidHexError if the hex string is invalid
+ * 
+ * Handles input with or without '0x' prefix.
+ * Validates hex format and ensures even length.
+ * 
+ * @param hex - Hexadecimal string (with or without '0x' prefix)
+ * @returns Uint8Array representation of hex string
+ * @throws Error if hex string is invalid or has odd length
+ * 
+ * @example
+ * hexToBytes('0xdeadbeef') // Uint8Array([0xde, 0xad, 0xbe, 0xef])
+ * hexToBytes('deadbeef')   // Uint8Array([0xde, 0xad, 0xbe, 0xef])
  */
 export function hexToBytes(hex: string): Uint8Array {
   const cleanHex = hex.replace('0x', '');
@@ -67,7 +77,17 @@ export function hexToBytes(hex: string): Uint8Array {
 
 /**
  * Convert a Uint8Array to a hexadecimal string.
- * @throws Error if input is invalid
+ * 
+ * Each byte is converted to its two-character hex representation.
+ * Leading zeros are preserved (e.g., 0x01, not 0x1).
+ * 
+ * @param bytes - Uint8Array to convert
+ * @returns Hexadecimal string with '0x' prefix and lowercase letters
+ * @throws Error if input is empty or contains invalid byte values
+ * 
+ * @example
+ * bytesToHex(new Uint8Array([0xde, 0xad])) // '0xdead'
+ * bytesToHex(new Uint8Array([0x00, 0x0f])) // '0x000f'
  */
 export function bytesToHex(bytes: Uint8Array): string {
   if (!bytes || bytes.length === 0) {
@@ -240,6 +260,17 @@ export function deriveAddress(privateKey: string): string {
 
 /**
  * Compute Keccak-256 hash of input bytes.
+ * 
+ * Implements RFC 3394 Keccak-256 (SHA3-256 padding variant).
+ * This is the standard hash function used by Ethereum for state hashing.
+ * 
+ * @param data - Input bytes to hash
+ * @returns 32-byte hash as Uint8Array
+ * @throws Error if data is invalid
+ * 
+ * @example
+ * keccak256(new Uint8Array([])) // Empty input hash
+ * keccak256(encoder.encode('hello')) // Hash of "hello"
  */
 export function keccak256(data: Uint8Array<ArrayBufferLike>): Uint8Array<ArrayBuffer> {
   return keccak256Pure(new Uint8Array(data));
