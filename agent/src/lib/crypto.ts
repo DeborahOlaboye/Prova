@@ -53,3 +53,26 @@ const SECP256K1_P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFF
 const SECP256K1_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
 const SECP256K1_GX = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n;
 const SECP256K1_GY = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n;
+
+/**
+ * Modular exponentiation for BigInt
+ */
+function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
+  let result = 1n;
+  base = base % mod;
+  while (exp > 0n) {
+    if (exp % 2n === 1n) {
+      result = (result * base) % mod;
+    }
+    exp = exp / 2n;
+    base = (base * base) % mod;
+  }
+  return result;
+}
+
+/**
+ * Modular inverse using Fermat's little theorem
+ */
+function modInverse(a: bigint, mod: bigint): bigint {
+  return modPow(a, mod - 2n, mod);
+}
