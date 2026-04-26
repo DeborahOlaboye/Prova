@@ -143,41 +143,51 @@ function pointMultiply(k: bigint, gx: bigint, gy: bigint): [bigint, bigint] | nu
 
 /**
  * Derive Ethereum/Celo address from a secp256k1 private key.
+ * 
+ * @param privateKey - 32-byte secp256k1 private key as hex string
+ * @returns Ethereum address (20 bytes) as hex string with 0x prefix
+ * @throws InvalidPrivateKeyError if private key is invalid
+ * @throws EllipticCurveError if point operations fail
  */
 export function deriveAddress(privateKey: string): string {
-  const keyBytes = hexToBytes(privateKey);
-  
-  if (keyBytes.length !== 32) {
-    throw new Error('Private key must be 32 bytes');
+  try {
+    // Validate input
+    validatePrivateKeyInput(privateKey);
+
+    const privateKeyBigInt = BigInt(privateKey.startsWith('0x') ? privateKey : '0x' + privateKey);
+
+    // Multiply generator point by private key
+    const result = pointMultiply(privateKeyBigInt, SECP256K1_GX, SECP256K1_GY);
+    if (!result) {
+      throw new EllipticCurveError('Invalid private key: resulted in point at infinity');
+    }
+
+    const [x, y] = result;
+    
+    // Validate resulting public key point
+    validatePublicKeyPoint(x, y);
+
+    // Convert x and y to 32-byte hex strings
+    const xHex = x.toString(16).padStart(64, '0');
+    const yHex = y.toString(16).padStart(64, '0');
+
+    // Concatenate x and y (uncompressed public key without 0x04 prefix)
+    const publicKeyBytes = hexToBytes(xHex + yHex);
+
+    // Hash with Keccak-256
+    const hash = keccak256(publicKeyBytes);
+
+    // Take last 20 bytes as address
+    const address = '0x' + bytesToHex(hash.slice(12));
+    return address;
+  } catch (error) {
+    if (error instanceof InvalidPrivateKeyError || error instanceof EllipticCurveError) {
+      throw error;
+    }
+    throw new InvalidPrivateKeyError(
+      `Failed to derive address: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
-
-  const privateKeyBigInt = BigInt('0x' + privateKey.replace('0x', ''));
-  
-  if (privateKeyBigInt <= 0n || privateKeyBigInt >= SECP256K1_N) {
-    throw new Error('Private key must be between 1 and n-1');
-  }
-
-  // Multiply generator point by private key
-  const result = pointMultiply(privateKeyBigInt, SECP256K1_GX, SECP256K1_GY);
-  if (!result) {
-    throw new Error('Invalid private key: resulted in point at infinity');
-  }
-
-  const [x, y] = result;
-
-  // Convert x and y to 32-byte hex strings
-  const xHex = x.toString(16).padStart(64, '0');
-  const yHex = y.toString(16).padStart(64, '0');
-
-  // Concatenate x and y (uncompressed public key without 0x04 prefix)
-  const publicKeyBytes = hexToBytes(xHex + yHex);
-
-  // Hash with Keccak-256
-  const hash = keccak256(publicKeyBytes);
-
-  // Take last 20 bytes as address
-  const address = '0x' + bytesToHex(hash.slice(12));
-  return address;
 }
 
 /**
