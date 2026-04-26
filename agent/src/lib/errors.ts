@@ -60,6 +60,60 @@ export class NotFoundError extends Error {
 }
 
 /**
+ * Thrown when cryptographic operation fails.
+ */
+export class CryptoError extends Error {
+  constructor(
+    message: string,
+    public code?: string,
+    public cause?: Error
+  ) {
+    super(message);
+    this.name = 'CryptoError';
+  }
+}
+
+/**
+ * Thrown when invalid hex format is provided.
+ */
+export class InvalidHexError extends CryptoError {
+  constructor(message: string) {
+    super(message, 'INVALID_HEX');
+    this.name = 'InvalidHexError';
+  }
+}
+
+/**
+ * Thrown when private key validation fails.
+ */
+export class InvalidPrivateKeyError extends CryptoError {
+  constructor(message: string) {
+    super(message, 'INVALID_PRIVATE_KEY');
+    this.name = 'InvalidPrivateKeyError';
+  }
+}
+
+/**
+ * Thrown when signature operation fails.
+ */
+export class SignatureError extends CryptoError {
+  constructor(message: string) {
+    super(message, 'SIGNATURE_FAILED');
+    this.name = 'SignatureError';
+  }
+}
+
+/**
+ * Thrown when point operations fail on elliptic curve.
+ */
+export class EllipticCurveError extends CryptoError {
+  constructor(message: string) {
+    super(message, 'ELLIPTIC_CURVE_FAILED');
+    this.name = 'EllipticCurveError';
+  }
+}
+
+/**
  * Require POST method for an endpoint.
  * Returns error response if method is not POST.
  */
