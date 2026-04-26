@@ -16,6 +16,16 @@ import {
   SignatureError,
   EllipticCurveError,
 } from './errors';
+
+/**
+ * Re-export error types for convenience
+ */
+export {
+  InvalidHexError,
+  InvalidPrivateKeyError,
+  SignatureError,
+  EllipticCurveError,
+} from './errors';
 import {
   validateHexString,
   validateHexLength,
