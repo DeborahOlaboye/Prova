@@ -10,8 +10,24 @@
  * The P-256 curve (used by Web Crypto) is NOT compatible with Ethereum addresses.
  */
 
+import {
+  InvalidHexError,
+  InvalidPrivateKeyError,
+  SignatureError,
+  EllipticCurveError,
+} from './errors';
+import {
+  validateHexString,
+  validateHexLength,
+  validatePrivateKey as validatePrivateKeyInput,
+  validateTransactionHash,
+  validatePublicKeyPoint,
+  validateSignatureComponents,
+} from './crypto-validation';
+
 /**
  * Convert a hexadecimal string to a Uint8Array.
+ * @throws InvalidHexError if the hex string is invalid
  */
 export function hexToBytes(hex: string): Uint8Array {
   const cleanHex = hex.replace('0x', '');
