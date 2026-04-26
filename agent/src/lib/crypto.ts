@@ -10,8 +10,58 @@
  * The P-256 curve (used by Web Crypto) is NOT compatible with Ethereum addresses.
  */
 
+import {
+  InvalidHexError,
+  InvalidPrivateKeyError,
+  SignatureError,
+  EllipticCurveError,
+} from './errors';
+
+/**
+ * Re-export error types for convenience
+ */
+export {
+  InvalidHexError,
+  InvalidPrivateKeyError,
+  SignatureError,
+  EllipticCurveError,
+} from './errors';
+import {
+  validateHexString,
+  validateHexLength,
+  validatePrivateKey as validatePrivateKeyInput,
+  validateTransactionHash,
+  validatePublicKeyPoint,
+  validateSignatureComponents,
+  validateTransactionObject,
+} from './crypto-validation';
+
+/**
+ * Re-export validation functions for convenience
+ */
+export {
+  validateHexString,
+  validateHexLength,
+  validatePrivateKey as validatePrivateKeyInput,
+  validateTransactionHash,
+  validatePublicKeyPoint,
+  validateSignatureComponents,
+  validateTransactionObject,
+} from './crypto-validation';
+
 /**
  * Convert a hexadecimal string to a Uint8Array.
+ * 
+ * Handles input with or without '0x' prefix.
+ * Validates hex format and ensures even length.
+ * 
+ * @param hex - Hexadecimal string (with or without '0x' prefix)
+ * @returns Uint8Array representation of hex string
+ * @throws Error if hex string is invalid or has odd length
+ * 
+ * @example
+ * hexToBytes('0xdeadbeef') // Uint8Array([0xde, 0xad, 0xbe, 0xef])
+ * hexToBytes('deadbeef')   // Uint8Array([0xde, 0xad, 0xbe, 0xef])
  */
 export function hexToBytes(hex: string): Uint8Array {
   const cleanHex = hex.replace('0x', '');
@@ -27,10 +77,30 @@ export function hexToBytes(hex: string): Uint8Array {
 
 /**
  * Convert a Uint8Array to a hexadecimal string.
+ * 
+ * Each byte is converted to its two-character hex representation.
+ * Leading zeros are preserved (e.g., 0x01, not 0x1).
+ * 
+ * @param bytes - Uint8Array to convert
+ * @returns Hexadecimal string with '0x' prefix and lowercase letters
+ * @throws Error if input is empty or contains invalid byte values
+ * 
+ * @example
+ * bytesToHex(new Uint8Array([0xde, 0xad])) // '0xdead'
+ * bytesToHex(new Uint8Array([0x00, 0x0f])) // '0x000f'
  */
 export function bytesToHex(bytes: Uint8Array): string {
+  if (!bytes || bytes.length === 0) {
+    throw new Error('Cannot convert empty byte array to hex');
+  }
+  
   return '0x' + Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
+    .map(b => {
+      if (b < 0 || b > 255) {
+        throw new Error(`Invalid byte value: ${b}. Expected value between 0 and 255`);
+      }
+      return b.toString(16).padStart(2, '0');
+    })
     .join('');
 }
 
@@ -79,93 +149,128 @@ function modInverse(a: bigint, mod: bigint): bigint {
 
 /**
  * Point addition on secp256k1
+ * @throws EllipticCurveError if operation fails
  */
 function pointAdd(
   x1: bigint, y1: bigint,
   x2: bigint, y2: bigint
 ): [bigint, bigint] | null {
-  if (x1 === 0n && y1 === 0n) return [x2, y2];
-  if (x2 === 0n && y2 === 0n) return [x1, y1];
-  if (x1 === x2 && y1 === y2) {
-    // Point doubling
-    if (y1 === 0n) return null;
-    const slopeDouble = (3n * x1 * x1 * modInverse(2n * y1, SECP256K1_P)) % SECP256K1_P;
-    const x3 = (slopeDouble * slopeDouble - 2n * x1) % SECP256K1_P;
-    const y3 = (slopeDouble * (x1 - x3) - y1) % SECP256K1_P;
-    return [x3, y3];
-  }
-  if (x1 === x2) return null; // Point at infinity
+  try {
+    if (x1 === 0n && y1 === 0n) return [x2, y2];
+    if (x2 === 0n && y2 === 0n) return [x1, y1];
+    if (x1 === x2 && y1 === y2) {
+      // Point doubling
+      if (y1 === 0n) return null;
+      const slopeDouble = (3n * x1 * x1 * modInverse(2n * y1, SECP256K1_P)) % SECP256K1_P;
+      const x3 = (slopeDouble * slopeDouble - 2n * x1) % SECP256K1_P;
+      const y3 = (slopeDouble * (x1 - x3) - y1) % SECP256K1_P;
+      return [x3, y3];
+    }
+    if (x1 === x2) return null; // Point at infinity
 
-  let slopeAdd = ((y2 - y1) % SECP256K1_P + SECP256K1_P) % SECP256K1_P;
-  slopeAdd = (slopeAdd * modInverse((x2 - x1 + SECP256K1_P) % SECP256K1_P, SECP256K1_P)) % SECP256K1_P;
-  const x3 = (slopeAdd * slopeAdd - x1 - x2) % SECP256K1_P;
-  const y3 = (slopeAdd * (x1 - x3) - y1) % SECP256K1_P;
-  return [x3, y3];
+    let slopeAdd = ((y2 - y1) % SECP256K1_P + SECP256K1_P) % SECP256K1_P;
+    slopeAdd = (slopeAdd * modInverse((x2 - x1 + SECP256K1_P) % SECP256K1_P, SECP256K1_P)) % SECP256K1_P;
+    const x3 = (slopeAdd * slopeAdd - x1 - x2) % SECP256K1_P;
+    const y3 = (slopeAdd * (x1 - x3) - y1) % SECP256K1_P;
+    return [x3, y3];
+  } catch (error) {
+    throw new EllipticCurveError(
+      `Point addition failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
 }
 
 /**
  * Scalar multiplication on secp256k1 using double-and-add algorithm
+ * @throws EllipticCurveError if operation fails
  */
 function pointMultiply(k: bigint, gx: bigint, gy: bigint): [bigint, bigint] | null {
-  let rx = 0n, ry = 0n; // Result point (point at infinity)
-  let tx = gx, ty = gy; // Temporary point (generator)
+  try {
+    let rx = 0n, ry = 0n; // Result point (point at infinity)
+    let tx = gx, ty = gy; // Temporary point (generator)
 
-  while (k > 0n) {
-    if (k & 1n) {
-      const result = pointAdd(rx, ry, tx, ty);
-      if (!result) return null;
-      [rx, ry] = result;
+    while (k > 0n) {
+      if (k & 1n) {
+        const result = pointAdd(rx, ry, tx, ty);
+        if (!result) return null;
+        [rx, ry] = result;
+      }
+      const doubled = pointAdd(tx, ty, tx, ty);
+      if (!doubled) return null;
+      [tx, ty] = doubled;
+      k >>= 1n;
     }
-    const doubled = pointAdd(tx, ty, tx, ty);
-    if (!doubled) return null;
-    [tx, ty] = doubled;
-    k >>= 1n;
-  }
 
-  return [rx, ry];
+    return [rx, ry];
+  } catch (error) {
+    throw new EllipticCurveError(
+      `Scalar multiplication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
 }
 
 /**
  * Derive Ethereum/Celo address from a secp256k1 private key.
+ * 
+ * @param privateKey - 32-byte secp256k1 private key as hex string
+ * @returns Ethereum address (20 bytes) as hex string with 0x prefix
+ * @throws InvalidPrivateKeyError if private key is invalid
+ * @throws EllipticCurveError if point operations fail
  */
 export function deriveAddress(privateKey: string): string {
-  const keyBytes = hexToBytes(privateKey);
-  
-  if (keyBytes.length !== 32) {
-    throw new Error('Private key must be 32 bytes');
+  try {
+    // Validate input
+    validatePrivateKeyInput(privateKey);
+
+    const privateKeyBigInt = BigInt(privateKey.startsWith('0x') ? privateKey : '0x' + privateKey);
+
+    // Multiply generator point by private key
+    const result = pointMultiply(privateKeyBigInt, SECP256K1_GX, SECP256K1_GY);
+    if (!result) {
+      throw new EllipticCurveError('Invalid private key: resulted in point at infinity');
+    }
+
+    const [x, y] = result;
+    
+    // Validate resulting public key point
+    validatePublicKeyPoint(x, y);
+
+    // Convert x and y to 32-byte hex strings
+    const xHex = x.toString(16).padStart(64, '0');
+    const yHex = y.toString(16).padStart(64, '0');
+
+    // Concatenate x and y (uncompressed public key without 0x04 prefix)
+    const publicKeyBytes = hexToBytes(xHex + yHex);
+
+    // Hash with Keccak-256
+    const hash = keccak256(publicKeyBytes);
+
+    // Take last 20 bytes as address
+    const address = '0x' + bytesToHex(hash.slice(12));
+    return address;
+  } catch (error) {
+    if (error instanceof InvalidPrivateKeyError || error instanceof EllipticCurveError) {
+      throw error;
+    }
+    throw new InvalidPrivateKeyError(
+      `Failed to derive address: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
-
-  const privateKeyBigInt = BigInt('0x' + privateKey.replace('0x', ''));
-  
-  if (privateKeyBigInt <= 0n || privateKeyBigInt >= SECP256K1_N) {
-    throw new Error('Private key must be between 1 and n-1');
-  }
-
-  // Multiply generator point by private key
-  const result = pointMultiply(privateKeyBigInt, SECP256K1_GX, SECP256K1_GY);
-  if (!result) {
-    throw new Error('Invalid private key: resulted in point at infinity');
-  }
-
-  const [x, y] = result;
-
-  // Convert x and y to 32-byte hex strings
-  const xHex = x.toString(16).padStart(64, '0');
-  const yHex = y.toString(16).padStart(64, '0');
-
-  // Concatenate x and y (uncompressed public key without 0x04 prefix)
-  const publicKeyBytes = hexToBytes(xHex + yHex);
-
-  // Hash with Keccak-256
-  const hash = keccak256(publicKeyBytes);
-
-  // Take last 20 bytes as address
-  const address = '0x' + bytesToHex(hash.slice(12));
-  return address;
 }
 
 /**
  * Compute Keccak-256 hash of input bytes.
+ * 
+ * Implements RFC 3394 Keccak-256 (SHA3-256 padding variant).
+ * This is the standard hash function used by Ethereum for state hashing.
+ * 
+ * @param data - Input bytes to hash
+ * @returns 32-byte hash as Uint8Array
+ * @throws Error if data is invalid
+ * 
+ * @example
+ * keccak256(new Uint8Array([])) // Empty input hash
+ * keccak256(encoder.encode('hello')) // Hash of "hello"
  */
 export function keccak256(data: Uint8Array<ArrayBufferLike>): Uint8Array<ArrayBuffer> {
   return keccak256Pure(new Uint8Array(data));
@@ -263,55 +368,79 @@ function rotl64(n: bigint, offset: number): bigint {
 
 /**
  * Sign a transaction hash using secp256k1.
+ * 
+ * @param txHash - 32-byte transaction hash as hex string
+ * @param privateKey - 32-byte secp256k1 private key as hex string
+ * @returns Signature components (r, s, v)
+ * @throws InvalidPrivateKeyError if private key is invalid
+ * @throws InvalidHexError if transaction hash is invalid
+ * @throws SignatureError if signature generation fails
  */
 export function signHash(txHash: string, privateKey: string): {
   r: string;
   s: string;
   v: number;
 } {
-  const hashBytes = hexToBytes(txHash);
-  const keyBytes = hexToBytes(privateKey);
-  
-  if (hashBytes.length !== 32) {
-    throw new Error('Transaction hash must be 32 bytes');
-  }
-  
-  if (keyBytes.length !== 32) {
-    throw new Error('Private key must be 32 bytes');
-  }
+  try {
+    // Validate inputs
+    validateTransactionHash(txHash);
+    validatePrivateKeyInput(privateKey);
 
-  const k = generateDeterministicK(hashBytes, keyBytes);
-  
-  const point = pointMultiply(k, SECP256K1_GX, SECP256K1_GY);
-  if (!point) {
-    throw new Error('Invalid k value');
-  }
-  
-  const r = point[0];
-  if (r === 0n) {
-    throw new Error('Invalid signature: r is zero');
-  }
+    const hashBytes = hexToBytes(txHash);
+    const privateKeyBigInt = BigInt(privateKey.startsWith('0x') ? privateKey : '0x' + privateKey);
 
-  const z = BigInt('0x' + txHash.replace('0x', ''));
-  const kInv = modInverse(k, SECP256K1_N);
-  const privateKeyBigInt = BigInt('0x' + privateKey.replace('0x', ''));
-  let s = (kInv * (z + r * privateKeyBigInt)) % SECP256K1_N;
-  
-  if (s === 0n) {
-    throw new Error('Invalid signature: s is zero');
+    const k = generateDeterministicK(hashBytes, hexToBytes(privateKey));
+    
+    try {
+      const point = pointMultiply(k, SECP256K1_GX, SECP256K1_GY);
+      if (!point) {
+        throw new SignatureError('Invalid k value: resulted in point at infinity');
+      }
+      
+      const r = point[0];
+      if (r === 0n) {
+        throw new SignatureError('Invalid signature: r component is zero');
+      }
+
+      const z = BigInt(txHash.startsWith('0x') ? txHash : '0x' + txHash);
+      const kInv = modInverse(k, SECP256K1_N);
+      let s = (kInv * (z + r * privateKeyBigInt)) % SECP256K1_N;
+      
+      if (s === 0n) {
+        throw new SignatureError('Invalid signature: s component is zero');
+      }
+
+      // Ensure low s value for signature malleability protection
+      if (s > SECP256K1_N / 2n) {
+        s = SECP256K1_N - s;
+      }
+
+      const v = (point[1] % 2n) === 0n ? 27 : 28;
+      
+      // Validate signature components
+      validateSignatureComponents(r, s, v);
+
+      return {
+        r: '0x' + r.toString(16).padStart(64, '0'),
+        s: '0x' + s.toString(16).padStart(64, '0'),
+        v: v
+      };
+    } catch (error) {
+      if (error instanceof SignatureError) {
+        throw error;
+      }
+      throw new SignatureError(
+        `Failed to generate signature: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  } catch (error) {
+    if (error instanceof InvalidPrivateKeyError || error instanceof InvalidHexError || error instanceof SignatureError) {
+      throw error;
+    }
+    throw new SignatureError(
+      `Signature operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
-
-  if (s > SECP256K1_N / 2n) {
-    s = SECP256K1_N - s;
-  }
-
-  const v = (point[1] % 2n) === 0n ? 27 : 28;
-
-  return {
-    r: '0x' + r.toString(16).padStart(64, '0'),
-    s: '0x' + s.toString(16).padStart(64, '0'),
-    v: v
-  };
 }
 
 function generateDeterministicK(messageHash: Uint8Array, privateKey: Uint8Array): bigint {
@@ -331,6 +460,10 @@ function generateDeterministicK(messageHash: Uint8Array, privateKey: Uint8Array)
 
 /**
  * Encode a transaction for signing using RLP encoding.
+ * 
+ * @param tx - Transaction object with required fields
+ * @returns Encoded transaction bytes
+ * @throws InvalidHexError if any field is invalid hex
  */
 export function encodeTransaction(tx: {
   nonce: string;
@@ -341,7 +474,10 @@ export function encodeTransaction(tx: {
   data: string;
   chainId: string;
 }): Uint8Array {
-  const fields = [
+  // Validate entire transaction object
+  validateTransactionObject(tx);
+
+  const encodedFields = [
     hexToBytes(tx.nonce),
     hexToBytes(tx.gasPrice),
     hexToBytes(tx.gas),
@@ -353,7 +489,7 @@ export function encodeTransaction(tx: {
     hexToBytes('0x'),
   ];
 
-  return rlpEncode(fields);
+  return rlpEncode(encodedFields);
 }
 
 function rlpEncode(items: Uint8Array[]): Uint8Array {

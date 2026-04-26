@@ -13,6 +13,11 @@ import {
   deriveAddress,
   signHash,
 } from './crypto';
+import {
+  InvalidPrivateKeyError,
+  InvalidHexError,
+  SignatureError,
+} from './errors';
 
 /**
  * Encode string to Uint8Array (polyfill for environments without TextEncoder)
@@ -174,5 +179,65 @@ describe('signHash', () => {
     expect(sig1.r).toBe(sig2.r);
     expect(sig1.s).toBe(sig2.s);
     expect(sig1.v).toBe(sig2.v);
+  });
+});
+
+describe('bytesToHex error handling', () => {
+  it('should reject empty byte array', () => {
+    expect(() => bytesToHex(new Uint8Array())).toThrow();
+  });
+
+  it('should handle byte values at boundaries', () => {
+    const bytes = new Uint8Array([0, 127, 255]);
+    const result = bytesToHex(bytes);
+    expect(result).toBe('0x007fff');
+  });
+});
+
+describe('deriveAddress error handling', () => {
+  it('should throw InvalidPrivateKeyError for invalid key', () => {
+    const zeroKey = '0x' + '00'.repeat(32);
+    expect(() => deriveAddress(zeroKey)).toThrow(InvalidPrivateKeyError);
+  });
+
+  it('should throw InvalidPrivateKeyError for key exceeding secp256k1 order', () => {
+    const invalidKey = '0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141';
+    expect(() => deriveAddress(invalidKey)).toThrow(InvalidPrivateKeyError);
+  });
+
+  it('should throw InvalidHexError for odd-length hex', () => {
+    const oddHex = '0x' + '01'.repeat(16) + '01'; // 33 bytes
+    expect(() => deriveAddress(oddHex)).toThrow(InvalidHexError);
+  });
+
+  it('should throw InvalidHexError for invalid hex characters', () => {
+    const invalidHex = '0xGG' + 'ab'.repeat(15);
+    expect(() => deriveAddress(invalidHex)).toThrow(InvalidHexError);
+  });
+});
+
+describe('signHash error handling', () => {
+  const validPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+
+  it('should throw InvalidHexError for invalid hash format', () => {
+    const invalidHash = '0xGG' + 'ab'.repeat(15);
+    expect(() => signHash(invalidHash, validPrivateKey)).toThrow(InvalidHexError);
+  });
+
+  it('should throw InvalidPrivateKeyError for invalid key format', () => {
+    const validHash = '0x' + 'ab'.repeat(32);
+    const invalidKey = '0xGG' + 'ab'.repeat(15);
+    expect(() => signHash(validHash, invalidKey)).toThrow(InvalidHexError);
+  });
+
+  it('should throw for hash with incorrect length', () => {
+    const shortHash = '0x' + 'ab'.repeat(16);
+    expect(() => signHash(shortHash, validPrivateKey)).toThrow();
+  });
+
+  it('should throw for private key with incorrect length', () => {
+    const validHash = '0x' + 'ab'.repeat(32);
+    const shortKey = '0x' + 'ab'.repeat(16);
+    expect(() => signHash(validHash, shortKey)).toThrow();
   });
 });
