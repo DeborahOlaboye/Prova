@@ -2,6 +2,27 @@
 
 Cloudflare Workers + Durable Objects agent layer for Prova.
 
+## Cryptography
+
+The agent uses proper **secp256k1** elliptic curve cryptography for Ethereum/Celo address derivation and transaction signing. This is implemented in pure TypeScript for Cloudflare Workers compatibility.
+
+### Key Functions
+
+| Function | Purpose |
+|---|---|
+| `deriveAddress(privateKey)` | Derive Ethereum address from secp256k1 private key |
+| `keccak256(data)` | Compute Keccak-256 hash (used for addresses and tx signing) |
+| `signHash(txHash, privateKey)` | Sign a transaction hash with secp256k1 |
+| `sendTransaction(req)` | Construct, sign, and broadcast a Celo transaction |
+
+### Testing
+
+```bash
+npm install
+npm test        # Run tests once
+npm run test:watch  # Run tests in watch mode
+```
+
 ## Agents
 
 | Agent | Route prefix | Purpose |
@@ -41,6 +62,16 @@ Record a completed job on the ReputationLedger.
 
 ### GET /health
 Returns `{ "status": "ok", "ts": <timestamp> }`.
+
+## Error Handling
+
+The agent uses custom error classes for clear error handling:
+
+| Error Class | Description |
+|---|---|
+| `ValidationError` | Invalid input parameters (bad address, missing fields) |
+| `RPCError` | Network/RPC node failures with error codes |
+| `TransactionError` | Transaction construction/signing failures |
 
 ## Setup
 
