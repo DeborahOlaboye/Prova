@@ -155,3 +155,50 @@ export function validateSignatureComponents(r: bigint, s: bigint, v: number): vo
     throw new Error(`Invalid signature: v must be 27 or 28, got ${v}`);
   }
 }
+
+/**
+ * Validates a complete transaction object for encoding.
+ * @param tx - Transaction object to validate
+ * @throws InvalidHexError if any field is invalid
+ */
+export function validateTransactionObject(tx: {
+  nonce: string;
+  gasPrice: string;
+  gas: string;
+  to: string;
+  value: string;
+  data: string;
+  chainId: string;
+}): void {
+  if (!tx || typeof tx !== 'object') {
+    throw new InvalidHexError('Transaction must be an object');
+  }
+
+  const requiredFields = ['nonce', 'gasPrice', 'gas', 'to', 'value', 'data', 'chainId'];
+  for (const field of requiredFields) {
+    if (!(field in tx)) {
+      throw new InvalidHexError(`Missing required transaction field: ${field}`);
+    }
+  }
+
+  const fieldValidations = [
+    { field: 'nonce', validator: validateHexString },
+    { field: 'gasPrice', validator: validateHexString },
+    { field: 'gas', validator: validateHexString },
+    { field: 'to', validator: validateHexString },
+    { field: 'value', validator: validateHexString },
+    { field: 'data', validator: (v: string) => validateHexString(v || '0x', 'data') },
+    { field: 'chainId', validator: validateHexString },
+  ];
+
+  for (const { field, validator } of fieldValidations) {
+    try {
+      const value = (tx as Record<string, string>)[field];
+      validator(value || '0x', field);
+    } catch (error) {
+      throw new InvalidHexError(
+        `Invalid transaction field "${field}": ${error instanceof Error ? error.message : 'unknown error'}`
+      );
+    }
+  }
+}
